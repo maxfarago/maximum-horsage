@@ -1,12 +1,11 @@
 import { defineConfig } from "vite";
-import { resolve } from "node:path";
 
 export default defineConfig({
   build: {
     rollupOptions: {
       input: {
-        main: resolve(__dirname, "index.html"),
-        annotate: resolve(__dirname, "tools/annotate/index.html"),
+        main: "index.html",
+        annotate: "tools/annotate/index.html",
       },
     },
   },
