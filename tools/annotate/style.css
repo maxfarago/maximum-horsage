@@ -176,6 +176,10 @@ aside p {
   color: var(--paper);
 }
 
+#strip button.drop {
+  opacity: 0.45;
+}
+
 #strip button.done {
   border-color: var(--accent);
 }

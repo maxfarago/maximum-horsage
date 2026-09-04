@@ -6,6 +6,7 @@ export default defineConfig({
       input: {
         main: "index.html",
         annotate: "tools/annotate/index.html",
+        preview: "tools/preview/index.html",
       },
     },
   },

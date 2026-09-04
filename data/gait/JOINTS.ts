@@ -48,3 +48,5 @@ export type DerivedName = (typeof DERIVED_JOINTS)[number]["name"];
 
 export const JOINT_COUNT = JOINTS.length;
 export const JOINT_NAMES = JOINTS.map((j) => j.name);
+
+export const CYCLE_FRAME_COUNT = 15;

@@ -1,4 +1,4 @@
-import { JOINT_COUNT, JOINT_NAMES, JOINTS } from "../../data/gait/JOINTS";
+import { CYCLE_FRAME_COUNT, JOINT_COUNT, JOINT_NAMES, JOINTS } from "../../data/gait/JOINTS";
 import plateUrl from "../../data/gait/plate.jpg";
 
 type Point = [number, number];
@@ -225,9 +225,13 @@ function renderUi() {
       const b = document.createElement("button");
       b.type = "button";
       const done = (points[f]?.length ?? 0) >= JOINT_COUNT;
-      b.textContent = `${f} ${points[f]?.length ?? 0}/${JOINT_COUNT}`;
+      b.textContent =
+        f >= CYCLE_FRAME_COUNT
+          ? `${f} drop`
+          : `${f} ${points[f]?.length ?? 0}/${JOINT_COUNT}`;
       if (f === frame) b.classList.add("on");
       if (done) b.classList.add("done");
+      if (f >= CYCLE_FRAME_COUNT) b.classList.add("drop");
       b.addEventListener("click", () => {
         frame = f;
         fit();
@@ -238,6 +242,7 @@ function renderUi() {
   );
 
   draw();
+  persist();
 }
 
 function place(p: Point) {
@@ -260,20 +265,11 @@ function undo() {
   renderUi();
 }
 
-function loadImage(src: string) {
-  const img = new Image();
-  img.onload = () => {
-    image = img;
-    ensureFrames();
-    fit();
-    renderUi();
-  };
-  img.src = src;
-}
+const SAVE_KEY = "maxhorse.annotate.v1";
 
-function exportJson() {
+function snapshot(): AnnotationFile {
   ensureFrames();
-  const file: AnnotationFile = {
+  return {
     plate: plateInput.value.trim() || "placeholder",
     frame_count: frameCount(),
     cols: cols(),
@@ -286,7 +282,36 @@ function exportJson() {
       points: pts.map((p) => (p === undefined ? null : p)),
     })),
   };
-  const blob = new Blob([JSON.stringify(file, null, 2)], { type: "application/json" });
+}
+
+function persist() {
+  localStorage.setItem(SAVE_KEY, JSON.stringify({ frame, data: snapshot() }));
+}
+
+function restore() {
+  const raw = localStorage.getItem(SAVE_KEY);
+  if (!raw) return;
+  try {
+    const saved = JSON.parse(raw) as { frame?: number; data: AnnotationFile };
+    if (saved.data) loadAnnotation(saved.data, saved.frame ?? 0);
+  } catch {
+    /* ignore a bad cache */
+  }
+}
+
+function loadImage(src: string) {
+  const img = new Image();
+  img.onload = () => {
+    image = img;
+    ensureFrames();
+    fit();
+    renderUi();
+  };
+  img.src = src;
+}
+
+function exportJson() {
+  const blob = new Blob([JSON.stringify(snapshot(), null, 2)], { type: "application/json" });
   const a = document.createElement("a");
   a.href = URL.createObjectURL(blob);
   a.download = "annotations.json";
@@ -294,7 +319,7 @@ function exportJson() {
   URL.revokeObjectURL(a.href);
 }
 
-function loadAnnotation(data: AnnotationFile) {
+function loadAnnotation(data: AnnotationFile, nextFrame = 0) {
   if (JSON.stringify(data.joint_order) !== JSON.stringify(JOINT_NAMES)) {
     window.alert("joint_order does not match frozen JOINTS.ts — refusing to load");
     return;
@@ -307,7 +332,7 @@ function loadAnnotation(data: AnnotationFile) {
   cropR.value = String(data.crop.right);
   cropB.value = String(data.crop.bottom);
   points = data.frames.map((f) => [...f.points]);
-  frame = 0;
+  frame = nextFrame;
   ensureFrames();
   fit();
   renderUi();
@@ -416,4 +441,5 @@ new ResizeObserver(() => {
 }).observe(canvas);
 
 loadImage(plateUrl);
+restore();
 renderUi();
