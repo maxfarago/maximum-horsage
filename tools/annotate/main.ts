@@ -1,5 +1,5 @@
 import { JOINT_COUNT, JOINT_NAMES, JOINTS } from "../../data/gait/JOINTS";
-import plateUrl from "../../data/gait/plate.placeholder.png";
+import plateUrl from "../../data/gait/plate.jpg";
 
 type Point = [number, number];
 type Slot = Point | null;
@@ -34,6 +34,7 @@ const fileInput = $<HTMLInputElement>("file");
 const jsonInput = $<HTMLInputElement>("json");
 const exportBtn = $<HTMLButtonElement>("export");
 const nameEl = $("current-name");
+const hintEl = $("current-hint");
 const metaEl = $("current-meta");
 const listEl = $<HTMLOListElement>("joints");
 const canvas = $<HTMLCanvasElement>("stage");
@@ -197,16 +198,18 @@ function renderUi() {
   const i = currentJoint();
   const n = frameCount();
   nameEl.textContent = i >= JOINT_COUNT ? "frame complete" : JOINT_NAMES[i];
+  hintEl.textContent = i >= JOINT_COUNT ? "next frame, or export if this was 15." : JOINTS[i].hint;
   metaEl.textContent = `${Math.min(i, JOINT_COUNT)} / ${JOINT_COUNT} · frame ${frame} / ${n}`;
 
   listEl.replaceChildren(
-    ...JOINT_NAMES.map((name, idx) => {
+    ...JOINTS.map((j, idx) => {
       const li = document.createElement("li");
       const slot = points[frame][idx];
       const mark = slot === undefined ? "·" : slot === null ? "s" : "●";
-      li.innerHTML = `<span class="mark">${idx}</span><span>${name}</span><span class="mark">${mark}</span>`;
+      li.title = j.hint;
+      li.innerHTML = `<span class="mark">${idx}</span><span>${j.name}</span><span class="mark">${mark}</span>`;
       if (idx === i) li.classList.add("current");
-      if (far(name)) li.classList.add("far");
+      if (far(j.name)) li.classList.add("far");
       li.addEventListener("click", () => {
         if (idx < points[frame].length) {
           points[frame] = points[frame].slice(0, idx);

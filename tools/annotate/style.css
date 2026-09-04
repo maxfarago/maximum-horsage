@@ -88,6 +88,12 @@ button {
   font-weight: 600;
 }
 
+#current-hint {
+  max-width: 46rem;
+  margin-top: 0.15rem;
+  color: var(--accent);
+}
+
 #current-meta {
   color: var(--accent);
 }
