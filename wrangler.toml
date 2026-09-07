@@ -1,0 +1,4 @@
+name = "maximum-horsage"
+account_id = "c7698f65669d1881d1f02fd4bcbc250a"
+compatibility_date = "2026-09-06"
+pages_build_output_dir = "./dist"
