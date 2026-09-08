@@ -84,7 +84,9 @@
   .card{max-width:460px;width:100%;text-align:center;background:var(--cream);
     border:4px solid var(--ink);border-radius:26px;box-shadow:0 8px 0 var(--ink);padding:30px 28px 24px}
   .card h1{font-size:56px;font-weight:700;line-height:.92;letter-spacing:-.03em}
-  .card h1 u{text-decoration:none;color:var(--pop)}
+  .card h1.brand{letter-spacing:0;line-height:.82;margin:0 0 4px}
+  .card h1.brand .word{display:flex;justify-content:space-between}
+  .card h1.brand .word i{font-style:normal}
   .card p{font-size:15px;font-weight:400;line-height:1.55;margin-top:14px;opacity:.85}
 
   #gloss{min-height:52px;margin-top:16px;font-size:15px;font-weight:400;line-height:1.45;
@@ -121,7 +123,7 @@
     border-radius:50%;background:var(--cream);border:3px solid var(--ink)}
   @media (hover:hover){#stick,#look,#knob{display:none!important}}
   @media (max-width:560px){
-    #sizeval{font-size:27px}.card h1{font-size:42px}#hint{display:none}
+    #sizeval{font-size:27px}.card h1{font-size:42px}.card h1.brand{font-size:38px}#hint{display:none}
     #nay{font-size:42px}#banner{font-size:16px}
   }
   @media (prefers-reduced-motion:reduce){

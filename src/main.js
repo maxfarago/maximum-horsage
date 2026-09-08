@@ -1,5 +1,6 @@
 import "./style.css";
 import * as THREE from "three";
+import { BufferGeometryUtils } from "three/examples/jsm/utils/BufferGeometryUtils.js";
 
 
 // ---------------------------------------------------------------- constants
@@ -43,11 +44,15 @@ function reseed(){ rnd = mulberry32(fnv1a(SEED)); }
 var trnd = mulberry32(0xC0FFEE);
 
 // ---------------------------------------------------------------- renderer
-var renderer = new THREE.WebGLRenderer({antialias:true, powerPreference:"high-performance"});
-renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+var DPR = Math.min(window.devicePixelRatio || 1, 1.25);
+var renderer = new THREE.WebGLRenderer({
+  antialias: DPR < 1.15,
+  powerPreference: "high-performance",
+});
+renderer.setPixelRatio(DPR);
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.type = THREE.BasicShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 document.body.appendChild(renderer.domElement);
 
@@ -114,7 +119,54 @@ var core = new THREE.Mesh(
   new THREE.MeshLambertMaterial({map:ballTexture()})
 );
 core.castShadow = true;
+core.receiveShadow = false;
 katamari.add(core);
+
+var bakeMat = new THREE.MeshLambertMaterial({ vertexColors: THREE.VertexColors });
+var bakeInv = new THREE.Matrix4();
+var bakeXform = new THREE.Matrix4();
+
+function bakeProp(root){
+  root.updateMatrixWorld(true);
+  bakeInv.copy(root.matrixWorld).invert();
+  var geos = [];
+  var doomed = [];
+  root.traverse(function(o){
+    if (!o.isMesh) return;
+    doomed.push(o);
+    var geo = o.geometry.clone();
+    bakeXform.multiplyMatrices(bakeInv, o.matrixWorld);
+    geo.applyMatrix4(bakeXform);
+    geo.deleteAttribute("uv");
+    geo.deleteAttribute("uv2");
+    var c = o.material.color;
+    var n = geo.attributes.position.count;
+    var cols = new Float32Array(n * 3);
+    for (var i = 0; i < n; i++){
+      cols[i*3] = c.r;
+      cols[i*3+1] = c.g;
+      cols[i*3+2] = c.b;
+    }
+    geo.setAttribute("color", new THREE.BufferAttribute(cols, 3));
+    geos.push(geo);
+  });
+  if (!geos.length) return;
+  var merged = BufferGeometryUtils.mergeBufferGeometries(geos, false);
+  for (var g = 0; g < geos.length; g++) geos[g].dispose();
+  if (!merged) return;
+  for (var d = doomed.length - 1; d >= 0; d--) doomed[d].parent.remove(doomed[d]);
+  merged.computeBoundingSphere();
+  var mesh = new THREE.Mesh(merged, bakeMat);
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  root.add(mesh);
+}
+
+function dumpBaked(obj){
+  obj.traverse(function(o){
+    if (o.isMesh && o.material === bakeMat && o.geometry) o.geometry.dispose();
+  });
+}
 
 // ---------------------------------------------------------------- prop kit
 var PAL = [0xff6b6b,0xffa14a,0xffd23f,0x8bd450,0x4fc4ff,0xb58cff,0xff8fc0,
@@ -135,7 +187,7 @@ function part(geo, color, sx, sy, sz, x, y, z){
   var m = new THREE.Mesh(geo, mat(color));
   m.scale.set(sx,sy,sz);
   m.position.set(x,y,z);
-  m.castShadow = true;
+  m.castShadow = false;
   return m;
 }
 var box = function(c,w,h,d,x,y,z){ return part(geoBox,c,w,h,d,x,y,z); };
@@ -676,8 +728,10 @@ function spawnWorld(count){
     var a = rnd()*Math.PI*2;
     g.position.set(Math.cos(a)*d, 0, Math.sin(a)*d);
     g.rotation.y = rnd()*Math.PI*2;
-    if (s < 0.7) g.traverse(function(o){ o.castShadow = false; });
     g.userData = {size:s, name:rec.name, r:s*0.42, hp:rec.hp || 0};
+    bakeProp(g);
+    g.updateMatrix();
+    g.matrixAutoUpdate = false;
     scene.add(g);
     props.push(g);
   }
@@ -691,6 +745,14 @@ function setRadius(r){
   radius = r;
   volume = (4/3)*Math.PI*r*r*r;
   core.scale.setScalar(r);
+  scene.fog.near = 60 + r*9;
+  scene.fog.far  = 230 + r*34;
+  camera.far = scene.fog.far + 40;
+  camera.updateProjectionMatrix();
+  var ext = Math.max(20, r*9);
+  var sc = sun.shadow.camera;
+  sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext;
+  sc.updateProjectionMatrix();
 }
 function powerMul(){ return 1 + Math.log10(Math.max(1,hp)) * 0.30; }
 function applyFov(){
@@ -700,8 +762,14 @@ function applyFov(){
 
 function reset(){
   var i;
-  for (i=0;i<props.length;i++) scene.remove(props[i]);
-  for (i=0;i<attached.length;i++) katamari.remove(attached[i]);
+  for (i=0;i<props.length;i++){
+    dumpBaked(props[i]);
+    scene.remove(props[i]);
+  }
+  for (i=0;i<attached.length;i++){
+    dumpBaked(attached[i]);
+    katamari.remove(attached[i]);
+  }
   props.length = 0; attached.length = 0;
 
   reseed();
@@ -739,6 +807,7 @@ function reset(){
 // ---------------------------------------------------------------- collecting
 function collect(p){
   var s = p.userData.size;
+  p.matrixAutoUpdate = true;
 
   katamari.getWorldQuaternion(tmpQ).invert();
   tmpV.copy(p.position).sub(katamari.position).applyQuaternion(tmpQ);
@@ -752,8 +821,7 @@ function collect(p){
   attached.push(p);
 
   volume += s*s*s*FILL;
-  radius = Math.cbrt(volume*3/(4*Math.PI));
-  core.scale.setScalar(radius);
+  setRadius(Math.cbrt(volume*3/(4*Math.PI)));
   collected++;
 
   if (p.userData.hp){ hp += p.userData.hp; applyFov(); }
@@ -761,6 +829,7 @@ function collect(p){
   for (var i=attached.length-1;i>=0;i--){
     var a = attached[i];
     if (a.position.length() + a.userData.size*0.55 < radius*0.94){
+      dumpBaked(a);
       katamari.remove(a);
       attached.splice(i,1);
     }
@@ -1054,21 +1123,25 @@ function step(dt){
     }
   }
   if (shake > 0) shake = Math.max(0, shake - dt*1.4);
+}
 
+function followSun(){
   sun.position.set(katamari.position.x + 30, 55, katamari.position.z + 22);
   sun.target.position.copy(katamari.position);
-  scene.fog.near = 60 + radius*9;
-  scene.fog.far  = 230 + radius*34;
-  var ext = Math.max(20, radius*9);
-  var sc = sun.shadow.camera;
-  sc.left = -ext; sc.right = ext; sc.top = ext; sc.bottom = -ext;
-  sc.updateProjectionMatrix();
 }
 
 var acc = 0;
+var fpsT = 0, fpsN = 0, fps = 0;
 function frame(){
   requestAnimationFrame(frame);
   var dt = Math.min(clock.getDelta(), 0.25);
+  fpsN++;
+  fpsT += dt;
+  if (fpsT >= 0.5){
+    fps = fpsN / fpsT;
+    fpsN = 0;
+    fpsT = 0;
+  }
 
   if (running){
     acc += dt;
@@ -1086,10 +1159,29 @@ function frame(){
     if (timeLeft <= 0) finish(cleared);
   }
 
+  followSun();
   updateRig(dt);
   placeCamera(dt, false);
   renderer.render(scene, camera);
 }
+
+window.__mh = function(){
+  var meshes = 0, shadow = 0;
+  scene.traverse(function(o){
+    if (!o.isMesh) return;
+    meshes++;
+    if (o.castShadow) shadow++;
+  });
+  return {
+    fps: +fps.toFixed(1),
+    calls: renderer.info.render.calls,
+    tris: renderer.info.render.triangles,
+    meshes: meshes,
+    shadow: shadow,
+    dpr: renderer.getPixelRatio(),
+    props: props.length,
+  };
+};
 
 // ---------------------------------------------------------------- flow
 function clearGoal(){
