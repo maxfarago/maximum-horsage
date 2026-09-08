@@ -1,42 +1,64 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>max.horse</title>
-    <style>
-      html,
-      body {
-        margin: 0;
-        height: 100%;
-        background: #e8dcc4;
-        overflow: hidden;
-      }
-      #game {
-        display: block;
-        width: 100%;
-        height: 100%;
-        touch-action: none;
-      }
-      nav {
-        position: fixed;
-        right: 12px;
-        top: 12px;
-        font: 13px/1.3 ui-sans-serif, system-ui, sans-serif;
-        color: #5a5044;
-      }
-      a {
-        color: inherit;
-      }
-    </style>
-  </head>
-  <body>
-    <canvas id="game"></canvas>
-    <nav>
-      <a href="/tools/annotate/">annotate</a>
-      ·
-      <a href="/tools/preview/">preview</a>
-    </nav>
-    <script type="module" src="/src/main.ts"></script>
-  </body>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>max.horse</title>
+</head>
+<body>
+
+<div id="hud">
+  <div id="size" class="plate">
+    <div class="cap">Max is</div>
+    <div id="sizeval">5.3<span>hh</span></div>
+    <div id="metric">60cm</div>
+    <div id="bar"><div id="barfill"></div></div>
+    <div id="foot"><span id="tier">foal</span><span id="hp">1 hp</span></div>
+  </div>
+
+  <div id="clock" class="plate">
+    <div class="cap">Time left</div>
+    <div id="time">3:00</div>
+  </div>
+
+  <div id="devbadge" class="hidden">dev field<br>[ ] size · T time · Y power</div>
+
+  <div id="banner"></div>
+  <div id="nay">nay.</div>
+  <div id="picked"></div>
+  <div id="hint">Small stuff sticks. Big stuff says nay.</div>
+</div>
+
+<div id="stick"></div>
+<div id="look"></div>
+<div id="knob"><i></i></div>
+
+<div class="veil" id="startveil">
+  <div class="card">
+    <h1>max<u>.</u>horse</h1>
+    <div id="gloss"></div>
+    <p>Max rolls in the grass, the way horses do. Everything smaller than him sticks. Everything bigger says no. Get to 78.2 hands in three minutes.</p>
+    <div class="keys">
+      <b>W A S D</b><b>arrow keys</b><b>drag to turn the camera</b>
+    </div>
+    <button id="startbtn">Start rolling</button>
+    <div class="seedline" id="seedstart"></div>
+  </div>
+</div>
+
+<div class="veil hidden" id="endveil">
+  <div class="card">
+    <h1 id="endtitle">time.</h1>
+    <div id="final">0hh</div>
+    <div id="tally"></div>
+    <div id="expr"><em>&gt;</em> max.horse <em>→</em> <b id="exprval">0</b></div>
+    <p id="endnote"></p>
+    <button id="againbtn">Roll again</button>
+    <div class="devnote hidden" id="devnote">dev field. This one doesn't count.</div>
+    <div class="seedline" id="seedend"></div>
+  </div>
+</div>
+
+<script type="module" src="/src/main.js"></script>
+</body>
 </html>

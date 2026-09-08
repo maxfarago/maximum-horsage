@@ -10,10 +10,12 @@
     "moduleDetection": "force",
     "strict": true,
     "noEmit": true,
+    "allowJs": true,
+    "checkJs": false,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
-  "include": ["src", "tools", "data"]
+  "include": ["src"]
 }

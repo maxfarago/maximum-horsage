@@ -5,11 +5,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "vite build",
+    "deploy": "vite build && wrangler pages deploy dist --project-name maximum-horsage",
     "preview": "vite preview"
   },
   "devDependencies": {
     "typescript": "^7.0.2",
     "vite": "^8.2.2"
+  },
+  "dependencies": {
+    "three": "^0.128.0"
   }
 }
