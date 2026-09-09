@@ -105,12 +105,16 @@
   .keys{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;margin-top:20px}
   .keys b{background:var(--ink);color:var(--cream);font-weight:600;font-size:13px;
     padding:6px 11px;border-radius:9px}
+  .btns{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:22px}
+  .btns button{margin-top:0;min-width:140px}
   button{font-family:inherit;font-size:19px;font-weight:600;color:var(--ink);
     background:var(--sun);border:3px solid var(--ink);border-radius:16px;
     box-shadow:0 5px 0 var(--ink);padding:13px 34px;margin-top:22px;cursor:pointer;
     transition:transform .07s,box-shadow .07s}
   button:active{transform:translateY(5px);box-shadow:0 0 0 var(--ink)}
   button:focus-visible{outline:3px solid var(--pop);outline-offset:3px}
+  button.secondary{background:var(--cream)}
+  #clock.done{pointer-events:auto;cursor:pointer}
 
   #final{font-size:62px;font-weight:700;color:var(--pop);line-height:1;margin-top:6px}
   #final span{font-size:28px}

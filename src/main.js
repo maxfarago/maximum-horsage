@@ -15,6 +15,9 @@ var MAX_STEPS   = 6;
 var HEAD_K      = 0.85;
 var HEAD_POW    = 0.65;
 var CM_PER_HAND = 10.16;    // four inches, exactly
+var MODE_KEY    = "maxhorse-mode";
+var HINT_TIMED  = "Small stuff sticks. Big stuff says nay. Grow quiet — the army only notices when you get big.";
+var HINT_ENDLESS= "No bell. Esc or tap the clock when you're done.";
 var UP          = new THREE.Vector3(0,1,0);
 var DEBRIS_CAP  = 24;
 var TRACER_CAP  = 40;
@@ -45,6 +48,13 @@ var DEV  = SEED === "dev";
 var rnd  = mulberry32(fnv1a(SEED));
 function reseed(){ rnd = mulberry32(fnv1a(SEED)); }
 var trnd = mulberry32(0xC0FFEE);
+
+function loadMode(){
+  try { return sessionStorage.getItem(MODE_KEY) || "timed"; } catch(e){ return "timed"; }
+}
+function saveMode(m){
+  try { sessionStorage.setItem(MODE_KEY, m); } catch(e){}
+}
 
 // ---------------------------------------------------------------- renderer
 var DPR = Math.min(window.devicePixelRatio || 1, 1.25);
@@ -1310,8 +1320,8 @@ function clearEnemies(){
 }
 
 // ---------------------------------------------------------------- state
-var radius, volume, collected, timeLeft, running, vel, camYaw, shake, cleared;
-var hp, tier, dirty;
+var radius, volume, collected, timeLeft, elapsed, running, vel, camYaw, shake, cleared;
+var hp, tier, dirty, gameMode;
 
 function setRadius(r){
   radius = r;
@@ -1350,6 +1360,7 @@ function reset(){
   setRadius(START_R);
   collected= 0;
   timeLeft = ROUND_TIME;
+  elapsed  = 0;
   cleared  = false;
   dirty    = false;
   hp       = 1;
@@ -1371,10 +1382,12 @@ function reset(){
   pickedEl.innerHTML = "";
   bannerEl.classList.remove("show");
   var h = document.getElementById("hint");
+  h.textContent = gameMode === "endless" ? HINT_ENDLESS : HINT_TIMED;
   h.style.opacity = 1;
   setTimeout(function(){ h.style.opacity = 0; }, 7000);
   applyFov();
   syncHUD();
+  syncClock();
   updateRig(0);
   placeCamera(0, true);
 }
@@ -1484,6 +1497,7 @@ var tierEl  = document.getElementById("tier");
 var hpEl    = document.getElementById("hp");
 var timeEl  = document.getElementById("time");
 var clockEl = document.getElementById("clock");
+var clockCap = clockEl.querySelector(".cap");
 
 function progOf(r){
   return (Math.log(r/START_R) / Math.log(GOAL_R/START_R)) * 100;
@@ -1516,9 +1530,19 @@ function syncHUD(){
   }
 }
 function syncClock(){
-  var t = Math.max(0, Math.ceil(timeLeft));
-  timeEl.textContent = Math.floor(t/60) + ":" + ("0" + (t%60)).slice(-2);
-  clockEl.classList.toggle("low", t <= 20);
+  if (running && gameMode === "endless"){
+    clockCap.textContent = "Time";
+    var t = Math.max(0, Math.floor(elapsed));
+    timeEl.textContent = Math.floor(t/60) + ":" + ("0" + (t%60)).slice(-2);
+    clockEl.classList.remove("low");
+    clockEl.classList.add("done");
+  } else {
+    clockCap.textContent = "Time left";
+    var tl = Math.max(0, Math.ceil(timeLeft));
+    timeEl.textContent = Math.floor(tl/60) + ":" + ("0" + (tl%60)).slice(-2);
+    clockEl.classList.toggle("low", tl <= 20);
+    clockEl.classList.remove("done");
+  }
 }
 
 // ---------------------------------------------------------------- input
@@ -1526,6 +1550,11 @@ var keys = {};
 addEventListener("keydown", function(e){
   keys[e.code] = true;
   if (["ArrowUp","ArrowDown","ArrowLeft","ArrowRight","Space"].indexOf(e.code) >= 0) e.preventDefault();
+  if (e.code === "Escape" && running && gameMode === "endless"){
+    e.preventDefault();
+    finish(cleared);
+    return;
+  }
   if (DEV && running) devKey(e.code);
 });
 addEventListener("keyup", function(e){ keys[e.code] = false; });
@@ -1535,7 +1564,7 @@ addEventListener("blur", function(){ keys = {}; });
 function devKey(code){
   if (code === "BracketRight"){ setRadius(radius*1.4); dirty = true; }
   else if (code === "BracketLeft"){ setRadius(Math.max(START_R, radius/1.4)); dirty = true; }
-  else if (code === "KeyT"){ timeLeft += 30; dirty = true; }
+  else if (code === "KeyT" && gameMode === "timed"){ timeLeft += 30; dirty = true; }
   else if (code === "KeyY"){ hp *= 4; applyFov(); dirty = true; }
   else return;
   checkTier();
@@ -1767,15 +1796,16 @@ function frame(){
     var n = 0;
     while (acc >= FIXED && n < MAX_STEPS && running){
       step(FIXED);
-      timeLeft -= FIXED;
+      if (gameMode === "endless") elapsed += FIXED;
+      else timeLeft -= FIXED;
       acc -= FIXED;
       n++;
-      if (timeLeft <= 0) break;
+      if (gameMode !== "endless" && timeLeft <= 0) break;
     }
     if (acc > FIXED*MAX_STEPS) acc = 0;
     syncClock();
     if (radius >= GOAL_R && !cleared) clearGoal();
-    if (timeLeft <= 0) finish(cleared);
+    if (gameMode !== "endless" && timeLeft <= 0) finish(cleared);
     maintainEnemies();
   }
 
@@ -1803,6 +1833,8 @@ window.__mh = function(){
     shadow: shadow,
     dpr: renderer.getPixelRatio(),
     props: props.length,
+    mode: gameMode,
+    elapsed: +elapsed.toFixed(2),
     cx: +camera.position.x.toFixed(5),
     cz: +camera.position.z.toFixed(5),
     mix: (function(){
@@ -1833,20 +1865,27 @@ var startveil = document.getElementById("startveil");
 var endveil   = document.getElementById("endveil");
 
 function finish(won){
+  if (!running) return;
   running = false;
   var h = handsOf(radius);
-  document.getElementById("endtitle").textContent = won ? "MAX HORSE" : "time.";
+  var endless = gameMode === "endless";
+  document.getElementById("endtitle").textContent = won ? "MAX HORSE" : (endless ? "enough." : "time.");
   document.getElementById("final").innerHTML = handsText(h) + "<span>hh</span>";
   document.getElementById("tally").textContent =
     collected + " things stuck to Max · " + metricText(radius) + " across";
   document.getElementById("exprval").textContent = handsText(h) + "hh, " + Math.round(hp) + " hp";
   document.getElementById("endnote").textContent = won
-    ? "Sampson managed 21.2hh in 1850 and nothing has beaten him since. Max did it in three minutes."
-    : "Start on the crumbs. Every pickup unlocks the next size up.";
+    ? (endless
+      ? "Sampson managed 21.2hh in 1850 and nothing has beaten him since."
+      : "Sampson managed 21.2hh in 1850 and nothing has beaten him since. Max did it in three minutes.")
+    : (endless
+      ? "No bell. The field was always going to wait."
+      : "Start on the crumbs. Every pickup unlocks the next size up.");
   document.getElementById("devnote").classList.toggle("hidden", !dirty);
   document.getElementById("seedend").textContent = "field " + SEED;
   endveil.classList.remove("hidden");
-  submitKing(won);
+  syncClock();
+  if (!endless) submitKing(won);
 }
 
 function kingLine(k){
@@ -1897,17 +1936,24 @@ function submitKing(won){
   }).catch(function(){});
 }
 
-function begin(){
+function begin(mode){
   if (typeof speechSynthesis !== "undefined") try { speechSynthesis.cancel(); } catch (e){}
+  gameMode = mode === "endless" ? "endless" : "timed";
+  saveMode(gameMode);
   startveil.classList.add("hidden");
   endveil.classList.add("hidden");
   reset();
   clock.getDelta();
   acc = 0;
   running = true;
+  syncClock();
 }
-document.getElementById("startbtn").addEventListener("click", begin);
-document.getElementById("againbtn").addEventListener("click", begin);
+document.getElementById("start-timed").addEventListener("click", function(){ begin("timed"); });
+document.getElementById("start-endless").addEventListener("click", function(){ begin("endless"); });
+document.getElementById("againbtn").addEventListener("click", function(){ begin(loadMode()); });
+clockEl.addEventListener("click", function(){
+  if (running && gameMode === "endless") finish(cleared);
+});
 
 addEventListener("resize", function(){
   camera.aspect = innerWidth/innerHeight;
@@ -1935,7 +1981,7 @@ setInterval(function(){
 var seedstart = document.getElementById("seedstart");
 if (DEV){
   document.getElementById("devbadge").classList.remove("hidden");
-  seedstart.innerHTML = "dev field &middot; <b>[</b> <b>]</b> size, <b>T</b> time, <b>Y</b> power " +
+  seedstart.innerHTML = "dev field &middot; <b>[</b> <b>]</b> size, <b>T</b> time (timed only), <b>Y</b> power " +
                         "&middot; <a href='?'>today's field</a>";
 } else {
   seedstart.innerHTML = "field " + SEED + " — everyone gets the same one today " +
@@ -1943,6 +1989,7 @@ if (DEV){
 }
 
 // idle backdrop behind the title card
+gameMode = loadMode();
 reset();
 running = false;
 loadKing();
