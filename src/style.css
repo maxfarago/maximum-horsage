@@ -39,6 +39,14 @@
   #clock .cap{font-size:12px;font-weight:600;opacity:.6}
   #time{font-size:30px;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.05}
   #clock.low #time{color:var(--pop)}
+  #wanted{position:absolute;top:16px;left:50%;transform:translateX(-50%);
+    display:flex;gap:5px;padding:7px 12px;background:rgba(43,33,64,.78);
+    border-radius:99px;border:2px solid var(--ink);opacity:0;transition:opacity .35s;
+    pointer-events:none}
+  #wanted.show{opacity:1}
+  #wanted i{width:14px;height:14px;display:block;
+    background:rgba(255,255,255,.22);clip-path:polygon(50% 0%,61% 35%,98% 35%,68% 57%,79% 91%,50% 70%,21% 91%,32% 57%,2% 35%,39% 35%)}
+  #wanted i.on{background:var(--sun)}
 
   #devbadge{position:absolute;top:96px;right:16px;background:var(--ink);color:var(--sun);
     font-size:11px;font-weight:600;padding:5px 11px;border-radius:99px;text-align:right;line-height:1.5}
