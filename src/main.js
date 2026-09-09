@@ -16,6 +16,9 @@ var HEAD_K      = 0.85;
 var HEAD_POW    = 0.65;
 var CM_PER_HAND = 10.16;    // four inches, exactly
 var UP          = new THREE.Vector3(0,1,0);
+var DEBRIS_CAP  = 24;
+var TRACER_CAP  = 40;
+var HIT_INVULN  = 0.55;
 
 // ---------------------------------------------------------------- rng
 function fnv1a(s){
@@ -793,6 +796,478 @@ function crackTrojan(p){
   banner("it was full of greeks.", 2800);
 }
 
+// ---------------------------------------------------------------- debris / tracers
+var debris = [];
+var tracers = [];
+var hitInvuln = 0;
+var enemyTmp = new THREE.Vector3();
+
+function freezeDebrisEntry(d){
+  var m = d.mesh;
+  d.frozen = true;
+  d.vel.set(0, 0, 0);
+  var s = (m.userData && m.userData.size) || 0.2;
+  var r = (m.userData && m.userData.r) || s * 0.42;
+  m.position.y = Math.max(m.position.y, r * 0.5);
+  if (!m.userData) m.userData = {};
+  m.userData.size = s;
+  m.userData.r = r;
+  m.userData.name = m.userData.name || "debris";
+  m.userData.hp = m.userData.hp || 0;
+  m.updateMatrix();
+  m.matrixAutoUpdate = false;
+  props.push(m);
+}
+
+function spawnDebris(mesh, velImp){
+  if (debris.length >= DEBRIS_CAP){
+    freezeDebrisEntry(debris[0]);
+    debris.shift();
+  }
+  if (!mesh.userData) mesh.userData = {};
+  if (mesh.userData.size == null) mesh.userData.size = 0.2;
+  if (mesh.userData.r == null) mesh.userData.r = mesh.userData.size * 0.42;
+  mesh.matrixAutoUpdate = true;
+  scene.add(mesh);
+  debris.push({
+    mesh: mesh,
+    vel: velImp.clone(),
+    spin: new THREE.Vector3((Math.random()-0.5)*8, (Math.random()-0.5)*8, (Math.random()-0.5)*8),
+    frozen: false
+  });
+}
+
+function spawnTracer(from, dir, shedN){
+  if (tracers.length >= TRACER_CAP){
+    scene.remove(tracers[0].mesh);
+    tracers.shift();
+  }
+  var m = new THREE.Mesh(geoBox, mat(0xff4f4f));
+  m.scale.set(0.06, 0.06, 0.22);
+  m.position.copy(from);
+  m.lookAt(from.x + dir.x, from.y + dir.y, from.z + dir.z);
+  m.castShadow = false;
+  scene.add(m);
+  tracers.push({
+    mesh: m,
+    vel: dir.clone().multiplyScalar(18 + radius * 2),
+    life: 1.2,
+    shedN: shedN != null ? shedN : 1
+  });
+}
+
+function updateDynamics(dt){
+  var g = 40 * radius;
+  var rest = 0.22;
+  var fric = 0.88;
+  var i, d, m, speed, groundY, s;
+  for (i=debris.length-1;i>=0;i--){
+    d = debris[i];
+    if (d.frozen){ debris.splice(i,1); continue; }
+    m = d.mesh;
+    s = (m.userData && m.userData.size) || 0.2;
+    groundY = ((m.userData && m.userData.r) || s * 0.42) * 0.55;
+    d.vel.y -= g * dt;
+    m.position.addScaledVector(d.vel, dt);
+    m.rotation.x += d.spin.x * dt;
+    m.rotation.y += d.spin.y * dt;
+    m.rotation.z += d.spin.z * dt;
+    var dx = m.position.x - katamari.position.x;
+    var dy = m.position.y - katamari.position.y;
+    var dz = m.position.z - katamari.position.z;
+    var pr = (m.userData && m.userData.r) || 0.1;
+    if (dx*dx + dy*dy + dz*dz < (radius + pr)*(radius + pr) && s <= radius * PICKUP){
+      debris.splice(i,1);
+      collect(m);
+      continue;
+    }
+    if (m.position.y < groundY){
+      m.position.y = groundY;
+      if (d.vel.y < 0) d.vel.y = -d.vel.y * rest;
+      d.vel.x *= fric; d.vel.z *= fric;
+      d.vel.x *= 0.92; d.vel.z *= 0.92;
+      speed = d.vel.length();
+      if (speed < 0.4 + radius * 0.15){
+        freezeDebrisEntry(d);
+        debris.splice(i,1);
+      }
+    }
+  }
+  for (i=tracers.length-1;i>=0;i--){
+    d = tracers[i];
+    d.life -= dt;
+    d.mesh.position.addScaledVector(d.vel, dt);
+    d.vel.y -= g * dt * 0.3;
+    if (d.life <= 0 || d.mesh.position.y < 0){
+      scene.remove(d.mesh);
+      tracers.splice(i,1);
+      continue;
+    }
+    var tdx = d.mesh.position.x - katamari.position.x;
+    var tdy = d.mesh.position.y - katamari.position.y;
+    var tdz = d.mesh.position.z - katamari.position.z;
+    if (tdx*tdx + tdy*tdy + tdz*tdz < (radius + 0.15)*(radius + 0.15) && hitInvuln <= 0){
+      scene.remove(d.mesh);
+      tracers.splice(i,1);
+      var away = new THREE.Vector3(tdx, 0.2, tdz);
+      if (away.lengthSq() < 1e-6) away.set(1,0,0);
+      away.normalize();
+      onHit(away, d.shedN || 1, null);
+    }
+  }
+  if (hitInvuln > 0) hitInvuln -= dt;
+}
+
+function shrinkVolume(amount){
+  var r = Math.cbrt(Math.max(1e-8, volume - amount) * 3 / (4 * Math.PI));
+  if (r < START_R) r = START_R;
+  setRadius(r);
+}
+
+function shed(count, awayDir){
+  if (!attached.length){
+    shake = Math.min(0.35, shake + 0.1);
+    return;
+  }
+  attached.sort(function(a,b){ return b.position.length() - a.position.length(); });
+  var n = Math.min(count, attached.length);
+  var i, a, mesh, imp;
+  for (i=0;i<n;i++){
+    a = attached.shift();
+    a.updateMatrixWorld(true);
+    mesh = a.clone(true);
+    mesh.userData = {
+      size: a.userData.size,
+      r: a.userData.r,
+      name: a.userData.name || "debris",
+      hp: a.userData.hp || 0
+    };
+    tmpV.setFromMatrixPosition(a.matrixWorld).sub(katamari.position);
+    if (tmpV.lengthSq() < 1e-6) tmpV.copy(awayDir);
+    tmpV.y = Math.max(0.2, tmpV.y);
+    tmpV.normalize();
+    mesh.position.copy(katamari.position).addScaledVector(tmpV, radius + mesh.userData.size + 0.15);
+    mesh.quaternion.setFromRotationMatrix(a.matrixWorld);
+    katamari.remove(a);
+    shrinkVolume(a.userData.size * a.userData.size * a.userData.size * FILL);
+    imp = awayDir.clone().multiplyScalar(3.5 + radius * 1.8);
+    imp.y += 2.8 + radius * 0.8;
+    spawnDebris(mesh, imp);
+  }
+  checkTier();
+  syncHUD();
+}
+
+function onHit(awayDir, shedCount, nayProp){
+  shake = Math.min(0.45, 0.12 + shedCount * 0.08);
+  hitInvuln = HIT_INVULN;
+  if (attached.length) shed(shedCount, awayDir);
+  else shake = Math.min(0.35, shake + 0.1);
+  nay(nayProp);
+}
+
+// ---------------------------------------------------------------- enemies
+var soldiers = [];
+var tanks = [];
+var planes = [];
+var enemyBanners = {army:false, tank:false, plane:false};
+var wantedStars = 0;
+var wantedSeen = false;
+var wantedEl = null;
+
+function wantedLevelFromSize(hh){
+  if (hh < 8.5) return 0;
+  if (hh < 12.0) return 1;
+  if (hh < 14.5) return 2;
+  if (hh < 21.0) return 3;
+  if (hh < 30.0) return 4;
+  return 5;
+}
+
+function wantedCaps(stars){
+  if (stars <= 0) return {soldier:0, tank:0, plane:0};
+  if (stars === 1) return {soldier:2, tank:0, plane:0};
+  if (stars === 2) return {soldier:5, tank:0, plane:0};
+  if (stars === 3) return {soldier:7, tank:2, plane:0};
+  if (stars === 4) return {soldier:9, tank:3, plane:0};
+  return {soldier:10, tank:4, plane:3};
+}
+
+function updateWantedHUD(){
+  if (!wantedEl) wantedEl = document.getElementById("wanted");
+  if (!wantedEl) return;
+  var icons = wantedEl.querySelectorAll("i");
+  var i;
+  for (i=0;i<icons.length;i++){
+    if (i < wantedStars) icons[i].classList.add("on");
+    else icons[i].classList.remove("on");
+  }
+  if (wantedStars > 0) wantedEl.classList.add("show");
+  else wantedEl.classList.remove("show");
+}
+
+function bakeMover(g){
+  bakeProp(g);
+  g.matrixAutoUpdate = true;
+  return g;
+}
+
+function buildSoldier(){
+  var g = new THREE.Group();
+  var s = 0.5;
+  g.add(box(0x3d5a3a, s*0.14, s*0.22, s*0.10, 0, s*0.11, 0));
+  g.add(sph(0xe8b98d, s*0.07, 0, s*0.28, 0));
+  g.add(box(0x2f3f6b, s*0.16, s*0.06, s*0.06, s*0.08, s*0.18, 0));
+  bakeMover(g);
+  g.userData = {kind:"soldier", r:s*0.22, size:s, eatable:true, shootT:0.8 + trnd(), alert:false, patrolA:trnd()*Math.PI*2};
+  return g;
+}
+
+function buildTank(){
+  var g = new THREE.Group();
+  var s = 5;
+  g.add(box(0x4a5a42, s*0.72, s*0.22, s*0.42, 0, s*0.22, 0));
+  g.add(box(0x3a4a32, s*0.28, s*0.18, s*0.24, s*0.18, s*0.38, 0));
+  g.add(cyl(0x33383f, s*0.04, s*0.38, s*0.34, s*0.38, 0));
+  for (var k=-1;k<=1;k+=2)
+    for (var j=-1;j<=1;j+=2)
+      turn(g, cyl(0x222830, s*0.12, s*0.08, j*s*0.28, s*0.08, k*s*0.20), Math.PI/2,0,0);
+  bakeMover(g);
+  g.userData = {kind:"tank", r:s*0.45, size:s, eatable:false, shootT:0, shedN:4};
+  return g;
+}
+
+function buildPlane(){
+  var g = new THREE.Group();
+  var s = 15;
+  g.add(box(0x9aa3ad, s*0.55, s*0.08, s*0.12, 0, 0, 0));
+  turn(g, box(0x9aa3ad, s*0.18, s*0.04, s*0.55, 0, 0.02, 0), 0,0,0);
+  g.add(box(0x7a8a9a, s*0.10, s*0.10, s*0.10, s*0.22, 0.04, 0));
+  bakeMover(g);
+  g.userData = {kind:"plane", r:s*0.35, size:s, eatable:false, shootT:0, y:18};
+  return g;
+}
+
+function clampWorld(x){
+  return Math.max(-WORLD, Math.min(WORLD, x));
+}
+
+function spawnEnemy(kind){
+  var list = kind === "soldier" ? soldiers : kind === "tank" ? tanks : planes;
+  var caps = wantedCaps(wantedStars);
+  if (list.length >= caps[kind]) return;
+  var ang = trnd() * Math.PI * 2;
+  var dist;
+  if (kind === "soldier") dist = Math.max(22, scene.fog.far * 0.55 + trnd() * scene.fog.far * 0.25);
+  else if (kind === "tank") dist = Math.max(28, scene.fog.far * 0.6 + trnd() * scene.fog.far * 0.25);
+  else dist = Math.max(36, scene.fog.far * 0.7 + trnd() * scene.fog.far * 0.2);
+  dist = Math.min(dist, WORLD - 8);
+  var x = clampWorld(katamari.position.x + Math.cos(ang) * dist);
+  var z = clampWorld(katamari.position.z + Math.sin(ang) * dist);
+  var e = kind === "soldier" ? buildSoldier() : kind === "tank" ? buildTank() : buildPlane();
+  e.position.set(x, kind === "plane" ? (15 + trnd()*10) : e.userData.r, z);
+  e.rotation.y = trnd() * Math.PI * 2;
+  scene.add(e);
+  list.push(e);
+  if (kind === "soldier" && !enemyBanners.army){ enemyBanners.army = true; banner("The army has noticed.", 2800); }
+  if (kind === "tank" && !enemyBanners.tank){ enemyBanners.tank = true; banner("They brought a tank.", 2800); }
+  if (kind === "plane" && !enemyBanners.plane){ enemyBanners.plane = true; banner("Now they're cheating.", 2800); }
+}
+
+function maintainEnemies(){
+  var hh = handsOf(radius);
+  var next = wantedLevelFromSize(hh);
+  if (next > wantedStars){
+    wantedStars = next;
+    updateWantedHUD();
+    if (wantedStars === 1) banner("One star. Stay small next time.", 2600);
+    else if (wantedStars === 2) banner("Two stars. They're tracking you.", 2600);
+    else if (wantedStars === 3) banner("Three stars. They brought a tank.", 2800);
+    else if (wantedStars === 4) banner("Four stars. Heavy response.", 2600);
+    else if (wantedStars === 5) banner("Five stars. Now they're cheating.", 2800);
+  } else if (next < wantedStars){
+    if (hh < 7.5 && wantedStars > 0){ wantedStars = 0; updateWantedHUD(); }
+    else if (hh < 11 && wantedStars > 1){ wantedStars = 1; updateWantedHUD(); }
+    else if (hh < 13.5 && wantedStars > 2){ wantedStars = 2; updateWantedHUD(); }
+    else if (hh < 19 && wantedStars > 3){ wantedStars = 3; updateWantedHUD(); }
+    else if (hh < 27 && wantedStars > 4){ wantedStars = 4; updateWantedHUD(); }
+  }
+
+  var caps = wantedCaps(wantedStars);
+  if (wantedStars === 1 && soldiers.length < caps.soldier && trnd() < 0.08) spawnEnemy("soldier");
+  else if (wantedStars >= 2){
+    while (soldiers.length < caps.soldier && trnd() < 0.55) spawnEnemy("soldier");
+  }
+  if (wantedStars >= 3 && tanks.length < caps.tank && trnd() < 0.2) spawnEnemy("tank");
+  if (wantedStars >= 5 && planes.length < caps.plane && trnd() < 0.12) spawnEnemy("plane");
+
+  while (soldiers.length > caps.soldier){
+    var drop = soldiers.pop();
+    dumpBaked(drop);
+    scene.remove(drop);
+  }
+  while (tanks.length > caps.tank){ dumpBaked(tanks[tanks.length-1]); scene.remove(tanks.pop()); }
+  while (planes.length > caps.plane){ dumpBaked(planes[planes.length-1]); scene.remove(planes.pop()); }
+
+  var px = katamari.position.x, pz = katamari.position.z;
+  var maxD = WORLD * 1.25;
+  function cull(list){
+    for (var i=list.length-1;i>=0;i--){
+      var e = list[i];
+      var dx = e.position.x - px, dz = e.position.z - pz;
+      if (dx*dx + dz*dz > maxD*maxD){
+        dumpBaked(e);
+        scene.remove(e);
+        list.splice(i,1);
+      }
+    }
+  }
+  cull(soldiers); cull(tanks); cull(planes);
+}
+
+function updateEnemies(dt){
+  var px = katamari.position.x, py = katamari.position.y, pz = katamari.position.z;
+  var i, e, u, dx, dz, dist, sp;
+
+  for (i=0;i<soldiers.length;i++){
+    e = soldiers[i];
+    u = e.userData;
+    dx = px - e.position.x; dz = pz - e.position.z;
+    dist = Math.sqrt(dx*dx + dz*dz) || 1;
+    if (wantedStars <= 1){
+      if (!u.alert && dist < 14 + radius * 3){
+        u.alert = true;
+        wantedSeen = true;
+      }
+      if (!u.alert){
+        u.patrolA += dt * 0.7;
+        e.position.x = clampWorld(e.position.x + Math.cos(u.patrolA) * 1.2 * dt);
+        e.position.z = clampWorld(e.position.z + Math.sin(u.patrolA) * 1.2 * dt);
+        e.rotation.y = u.patrolA;
+      } else {
+        sp = 1.8 + radius * 0.25;
+        var stand = Math.max(5, radius * 2.2 + 3);
+        if (dist > stand){
+          e.position.x = clampWorld(e.position.x + (dx/dist) * sp * dt);
+          e.position.z = clampWorld(e.position.z + (dz/dist) * sp * dt);
+        }
+        e.rotation.y = Math.atan2(dx, dz);
+        if (dist > 28 + radius * 6) u.alert = false;
+      }
+    } else {
+      sp = 2.4 + radius * 0.45 + wantedStars * 0.15;
+      var standOff = Math.max(4, radius * 2.2 + 2.5);
+      if (dist > standOff){
+        e.position.x = clampWorld(e.position.x + (dx/dist) * sp * dt);
+        e.position.z = clampWorld(e.position.z + (dz/dist) * sp * dt);
+      } else if (dist < standOff * 0.65){
+        e.position.x = clampWorld(e.position.x - (dx/dist) * sp * 0.55 * dt);
+        e.position.z = clampWorld(e.position.z - (dz/dist) * sp * 0.55 * dt);
+      }
+      e.rotation.y = Math.atan2(dx, dz);
+      u.alert = true;
+    }
+
+    u.shootT -= dt;
+    var canShoot = (wantedStars >= 2 || u.alert) && dist < 22 + radius * 6;
+    if (u.shootT <= 0 && canShoot){
+      u.shootT = 1.0 + trnd() * 0.7;
+      enemyTmp.set(dx/dist, 0.15, dz/dist);
+      spawnTracer(e.position.clone().add(new THREE.Vector3(0, u.r, 0)), enemyTmp, 1);
+    }
+    if (dist < radius + u.r + 0.2 && u.size <= radius * PICKUP){
+      dumpBaked(e);
+      scene.remove(e); soldiers.splice(i,1); i--;
+      collectEnemy(e, u);
+    }
+  }
+
+  for (i=0;i<tanks.length;i++){
+    e = tanks[i];
+    u = e.userData;
+    dx = px - e.position.x; dz = pz - e.position.z;
+    dist = Math.sqrt(dx*dx + dz*dz) || 1;
+    sp = 1.1 + radius * 0.15;
+    e.position.x = clampWorld(e.position.x + (dx/dist) * sp * dt);
+    e.position.z = clampWorld(e.position.z + (dz/dist) * sp * dt);
+    e.rotation.y = Math.atan2(dx, dz);
+    u.shootT -= dt;
+    if (u.shootT <= 0 && dist < 55 + radius * 10){
+      u.shootT = 1.4 + trnd() * 0.8;
+      enemyTmp.set(dx/dist, 0.2, dz/dist);
+      spawnTracer(e.position.clone().add(new THREE.Vector3(0, u.r*0.6, 0)), enemyTmp, 3 + ((trnd()*4)|0));
+    }
+    if (dist < radius + u.r){
+      if (u.size > radius * PICKUP){
+        var tdx = e.position.x - px, tdz = e.position.z - pz;
+        var tl = Math.sqrt(tdx*tdx + tdz*tdz) || 1;
+        katamari.position.x += (tdx/tl) * 0.08;
+        katamari.position.z += (tdz/tl) * 0.08;
+        vel.x *= 0.5; vel.z *= 0.5;
+        if (hitInvuln <= 0) onHit(new THREE.Vector3(tdx/tl, 0.15, tdz/tl), u.shedN, e);
+      } else {
+        dumpBaked(e);
+        scene.remove(e); tanks.splice(i,1); i--;
+        collectEnemy(e, u);
+      }
+    }
+  }
+
+  for (i=0;i<planes.length;i++){
+    e = planes[i];
+    u = e.userData;
+    var ox = Math.cos(performance.now()*0.0004 + i) * (18 + radius * 2);
+    var oz = Math.sin(performance.now()*0.0004 + i) * (18 + radius * 2);
+    var tx = px + ox, tz = pz + oz;
+    dx = tx - e.position.x; dz = tz - e.position.z;
+    dist = Math.sqrt(dx*dx + dz*dz) || 1;
+    sp = 10 + radius * 0.5;
+    e.position.x = clampWorld(e.position.x + (dx/dist) * sp * dt);
+    e.position.z = clampWorld(e.position.z + (dz/dist) * sp * dt);
+    e.position.y = u.y + Math.sin(performance.now()*0.001 + i)*0.8;
+    e.rotation.y = Math.atan2(dx, dz);
+    dx = px - e.position.x; dz = pz - e.position.z;
+    dist = Math.sqrt(dx*dx + dz*dz) || 1;
+    u.shootT -= dt;
+    if (u.shootT <= 0 && dist < 80 + radius * 12){
+      u.shootT = 0.55 + trnd() * 0.35;
+      enemyTmp.set(dx/dist, -0.35, dz/dist).normalize();
+      spawnTracer(e.position.clone(), enemyTmp, 2);
+    }
+    u.eatable = py + radius >= e.position.y - u.r * 0.3;
+    if (dist < radius + u.r * 0.5 && u.eatable && u.size <= radius * PICKUP){
+      dumpBaked(e);
+      scene.remove(e); planes.splice(i,1); i--;
+      collectEnemy(e, u);
+    }
+  }
+}
+
+function collectEnemy(e, u){
+  volume += u.size * u.size * u.size * FILL * 0.5;
+  setRadius(Math.cbrt(volume * 3 / (4 * Math.PI)));
+  collected++;
+  announce(u.kind, 0);
+  checkTier();
+  syncHUD();
+}
+
+function clearEnemies(){
+  var i;
+  for (i=0;i<soldiers.length;i++){ dumpBaked(soldiers[i]); scene.remove(soldiers[i]); }
+  for (i=0;i<tanks.length;i++){ dumpBaked(tanks[i]); scene.remove(tanks[i]); }
+  for (i=0;i<planes.length;i++){ dumpBaked(planes[i]); scene.remove(planes[i]); }
+  soldiers.length = tanks.length = planes.length = 0;
+  for (i=0;i<debris.length;i++){ dumpBaked(debris[i].mesh); scene.remove(debris[i].mesh); }
+  for (i=0;i<tracers.length;i++) scene.remove(tracers[i].mesh);
+  debris.length = tracers.length = 0;
+  enemyBanners = {army:false, tank:false, plane:false};
+  wantedStars = 0;
+  wantedSeen = false;
+  hitInvuln = 0;
+  updateWantedHUD();
+}
+
 // ---------------------------------------------------------------- state
 var radius, volume, collected, timeLeft, running, vel, camYaw, shake, cleared;
 var hp, tier, dirty;
@@ -827,6 +1302,7 @@ function reset(){
     katamari.remove(attached[i]);
   }
   props.length = 0; attached.length = 0;
+  clearEnemies();
 
   reseed();
 
@@ -847,8 +1323,10 @@ function reset(){
 
   katamari.position.set(0, radius, 0);
   katamari.quaternion.identity();
+  stashPrev();
 
   spawnWorld(1100);
+  hitInvuln = 0;
   pickedEl.innerHTML = "";
   bannerEl.classList.remove("show");
   var h = document.getElementById("hint");
@@ -1095,6 +1573,31 @@ lookEl.addEventListener("touchmove", function(e){
 lookEl.addEventListener("touchend", function(){ lookId = null; });
 
 // ---------------------------------------------------------------- camera
+var prevPos = new THREE.Vector3();
+var prevQuat = new THREE.Quaternion();
+var savePos = new THREE.Vector3();
+var saveQuat = new THREE.Quaternion();
+var prevCamYaw = 0, saveCamYaw = 0;
+
+function stashPrev(){
+  prevPos.copy(katamari.position);
+  prevQuat.copy(katamari.quaternion);
+  prevCamYaw = camYaw;
+}
+function pushInterp(alpha){
+  savePos.copy(katamari.position);
+  saveQuat.copy(katamari.quaternion);
+  saveCamYaw = camYaw;
+  katamari.position.lerpVectors(prevPos, savePos, alpha);
+  katamari.quaternion.copy(prevQuat).slerp(saveQuat, alpha);
+  camYaw = angLerp(prevCamYaw, saveCamYaw, alpha);
+}
+function popInterp(){
+  katamari.position.copy(savePos);
+  katamari.quaternion.copy(saveQuat);
+  camYaw = saveCamYaw;
+}
+
 var camPos = new THREE.Vector3();
 var camAim = new THREE.Vector3();
 function placeCamera(dt, snap){
@@ -1124,6 +1627,7 @@ var fwd = new THREE.Vector3();
 var right = new THREE.Vector3();
 
 function step(dt){
+  stashPrev();
   var fx = 0, fz = 0;
   if (keys.KeyW || keys.ArrowUp)    fz += 1;
   if (keys.KeyS || keys.ArrowDown)  fz -= 1;
@@ -1155,6 +1659,9 @@ function step(dt){
     axis.crossVectors(UP, axis);
     katamari.rotateOnWorldAxis(axis, dist/radius);
   }
+
+  updateDynamics(dt);
+  updateEnemies(dt);
 
   var lim = WORLD;
   if (Math.abs(katamari.position.x) > lim){
@@ -1189,7 +1696,7 @@ function step(dt){
         vel.x += nx*into*1.5;
         vel.z += nz*into*1.5;
         shake = Math.min(0.35, into*0.03);
-        if (into > 1.2) nay(p);
+        if (into > 1.2) onHit(new THREE.Vector3(nx, 0.1, nz), attached.length ? 1 : 0, p);
       }
     }
   }
@@ -1228,12 +1735,16 @@ function frame(){
     syncClock();
     if (radius >= GOAL_R && !cleared) clearGoal();
     if (timeLeft <= 0) finish(cleared);
+    maintainEnemies();
   }
 
+  var alpha = running ? Math.max(0, Math.min(1, acc / FIXED)) : 1;
+  pushInterp(alpha);
   followSun();
   updateRig(dt);
   placeCamera(dt, false);
   renderer.render(scene, camera);
+  popInterp();
 }
 
 window.__mh = function(){
@@ -1250,7 +1761,9 @@ window.__mh = function(){
     meshes: meshes,
     shadow: shadow,
     dpr: renderer.getPixelRatio(),
-    props: props.length
+    props: props.length,
+    cx: +camera.position.x.toFixed(5),
+    cz: +camera.position.z.toFixed(5)
   };
 };
 
@@ -1299,6 +1812,7 @@ function showKing(k){
   updateRig(0);
   placeCamera(0, true);
   syncHUD();
+  stashPrev();
 }
 function loadKing(){
   return fetch("/api/max").then(function(r){
