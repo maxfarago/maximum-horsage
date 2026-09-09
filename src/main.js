@@ -628,6 +628,13 @@ var KIT = [
     return g;}},
   {name:"high horse", size:[7,11], w:3, hp:1, zone:[30,130], make:function(s){
     return quadruped(s*0.72, 0xdcc9a8, 0x8a6f45, 3.4);}},
+  {name:"trojan horse", size:[7.5,10], w:5, hp:1, trojan:true, zone:[18,90], make:function(s){
+    var g = quadruped(s, 0xc4a574, 0x5c3d24, 1.2);
+    turn(g, cyl(0x6b4a2f, s*0.12, s*0.08,  s*0.22, s*0.08,  s*0.16), Math.PI/2,0,0);
+    turn(g, cyl(0x6b4a2f, s*0.12, s*0.08,  s*0.22, s*0.08, -s*0.16), Math.PI/2,0,0);
+    turn(g, cyl(0x6b4a2f, s*0.12, s*0.08, -s*0.22, s*0.08,  s*0.16), Math.PI/2,0,0);
+    turn(g, cyl(0x6b4a2f, s*0.12, s*0.08, -s*0.22, s*0.08, -s*0.16), Math.PI/2,0,0);
+    return g;}},
   {name:"stable", size:[8,13], w:5, zone:[28,130], make:function(s){
     var g=new THREE.Group();
     g.add(box(0xc0503f, s*0.85, s*0.5, s*0.6, 0, s*0.25, 0));
@@ -718,7 +725,28 @@ var attached = [];
 var tmpV = new THREE.Vector3();
 var tmpQ = new THREE.Quaternion();
 
+function makeGreek(s){
+  var g = new THREE.Group();
+  g.add(box(0xf2ead4, s*0.22, s*0.42, s*0.16, 0, s*0.32, 0));
+  g.add(sph(0xe8b98d, s*0.09, 0, s*0.60, 0));
+  g.add(box(0x8a2a1a, s*0.26, s*0.07, s*0.26, 0, s*0.70, 0));
+  g.add(box(STEEL, s*0.04, s*0.34, s*0.04, s*0.16, s*0.38, 0));
+  return g;
+}
+
+function placeProp(g, size, name, hp, extra){
+  extra = extra || {};
+  g.userData = {size:size, name:name, r:size*0.42, hp:hp || 0, trojan:!!extra.trojan, opened:false};
+  bakeProp(g);
+  g.updateMatrix();
+  g.matrixAutoUpdate = false;
+  scene.add(g);
+  props.push(g);
+  return g;
+}
+
 function spawnWorld(count){
+  var hadTrojan = false;
   for (var i=0;i<count;i++){
     var rec = pickRecipe();
     var s = rec.size[0] + rnd()*(rec.size[1]-rec.size[0]);
@@ -728,13 +756,41 @@ function spawnWorld(count){
     var a = rnd()*Math.PI*2;
     g.position.set(Math.cos(a)*d, 0, Math.sin(a)*d);
     g.rotation.y = rnd()*Math.PI*2;
-    g.userData = {size:s, name:rec.name, r:s*0.42, hp:rec.hp || 0};
-    bakeProp(g);
-    g.updateMatrix();
-    g.matrixAutoUpdate = false;
-    scene.add(g);
-    props.push(g);
+    if (rec.trojan) hadTrojan = true;
+    placeProp(g, s, rec.name, rec.hp || 0, rec);
   }
+  if (!hadTrojan){
+    var rec = null;
+    for (var k=0;k<KIT.length;k++) if (KIT[k].trojan){ rec = KIT[k]; break; }
+    if (rec){
+      var s = rec.size[0] + rnd()*(rec.size[1]-rec.size[0]);
+      var g = rec.make(s, hue());
+      var a = rnd()*Math.PI*2;
+      g.position.set(Math.cos(a)*36, 0, Math.sin(a)*36);
+      g.rotation.y = rnd()*Math.PI*2;
+      placeProp(g, s, rec.name, rec.hp || 0, rec);
+    }
+  }
+}
+
+function crackTrojan(p){
+  if (p.userData.opened) return;
+  p.userData.opened = true;
+  var sr = mulberry32(fnv1a(SEED + ":trojan:" + p.position.x.toFixed(2) + "," + p.position.z.toFixed(2)));
+  for (var i=0;i<28;i++){
+    var ang = sr()*Math.PI*2;
+    var d = 1.1 + sr()*2.6;
+    var s = 0.18 + sr()*0.10;
+    var g = makeGreek(s);
+    g.position.set(p.position.x + Math.cos(ang)*d, 0, p.position.z + Math.sin(ang)*d);
+    g.rotation.y = sr()*Math.PI*2;
+    placeProp(g, s, "greek", 0, {});
+  }
+  p.scale.setScalar(0.55);
+  p.userData.size *= 0.55;
+  p.userData.r *= 0.55;
+  p.updateMatrix();
+  banner("it was full of greeks.", 2800);
 }
 
 // ---------------------------------------------------------------- state
@@ -863,11 +919,25 @@ function banner(text, ms){
   clearTimeout(bannerT);
   bannerT = setTimeout(function(){ bannerEl.classList.remove("show"); }, ms || 2600);
 }
+function ownerCall(t){
+  if (typeof speechSynthesis === "undefined") return;
+  try {
+    speechSynthesis.cancel();
+    var u = new SpeechSynthesisUtterance();
+    u.lang = "en-US";
+    if (t < 3){ u.text = "max."; u.rate = 0.85; u.pitch = 0.75; u.volume = 0.55; }
+    else if (t < 6){ u.text = "Max."; u.rate = 1.0; u.pitch = 0.95; u.volume = 0.8; }
+    else if (t < 9){ u.text = "Max!"; u.rate = 1.15; u.pitch = 1.15; u.volume = 1; }
+    else { u.text = "MAAAAAX"; u.rate = 0.7; u.pitch = 1.28; u.volume = 1; }
+    speechSynthesis.speak(u);
+  } catch (e){}
+}
 function checkTier(){
   var h = handsOf(radius);
   var t = tierIndex(h);
   if (t <= tier) { tier = t; return; }
   tier = t;
+  ownerCall(t);
   if (cleared) return;                  // goal banner owns the screen up there
   var row = TIERS[t];
   banner(row[2] || (handsText(row[0]) + "hh — " + row[1]), row[2] ? 3600 : 2200);
@@ -1105,6 +1175,7 @@ function step(dt){
     var d2 = dx*dx + dz*dz;
     var hit = radius + pr;
     if (d2 > hit*hit) continue;
+    if (p.userData.trojan && !p.userData.opened) crackTrojan(p);
     if (p.userData.size <= radius * PICKUP){
       props.splice(i,1);
       collect(p);
@@ -1179,13 +1250,14 @@ window.__mh = function(){
     meshes: meshes,
     shadow: shadow,
     dpr: renderer.getPixelRatio(),
-    props: props.length,
+    props: props.length
   };
 };
 
 // ---------------------------------------------------------------- flow
 function clearGoal(){
   cleared = true;
+  ownerCall(99);
   banner("78.2hh. Max is max. Keep going.", 3200);
 }
 
@@ -1206,9 +1278,58 @@ function finish(won){
   document.getElementById("devnote").classList.toggle("hidden", !dirty);
   document.getElementById("seedend").textContent = "field " + SEED;
   endveil.classList.remove("hidden");
+  submitKing(won);
+}
+
+function kingLine(k){
+  if (!k || !k.hh) return "no max horse yet. there can be only one.";
+  return "the max horse is <b>" + handsText(k.hh) + "hh</b>";
+}
+function showKing(k){
+  var start = document.getElementById("kingline");
+  var end = document.getElementById("kingend");
+  var html = kingLine(k);
+  if (start) start.innerHTML = html;
+  if (end) end.innerHTML = html;
+  if (!k || !k.radius || running) return;
+  if (startveil.classList.contains("hidden")) return;
+  setRadius(k.radius);
+  hp = k.hp || 1;
+  applyFov();
+  updateRig(0);
+  placeCamera(0, true);
+  syncHUD();
+}
+function loadKing(){
+  return fetch("/api/max").then(function(r){
+    if (!r.ok) return { king: null };
+    return r.json();
+  }).then(function(d){ showKing(d && d.king); }).catch(function(){ showKing(null); });
+}
+function submitKing(won){
+  if (dirty || DEV) return;
+  fetch("/api/max", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      radius: radius,
+      hp: hp,
+      collected: collected,
+      seed: SEED
+    })
+  }).then(function(r){ return r.ok ? r.json() : null; }).then(function(d){
+    if (!d) return;
+    if (d.king) showKing(d.king);
+    if (d.took){
+      document.getElementById("endtitle").textContent = "THE MAX HORSE";
+      var note = document.getElementById("endnote");
+      note.textContent = (won ? note.textContent + " " : "") + "this is the max horse.";
+    }
+  }).catch(function(){});
 }
 
 function begin(){
+  if (typeof speechSynthesis !== "undefined") try { speechSynthesis.cancel(); } catch (e){}
   startveil.classList.add("hidden");
   endveil.classList.add("hidden");
   reset();
@@ -1255,5 +1376,6 @@ if (DEV){
 // idle backdrop behind the title card
 reset();
 running = false;
+loadKing();
 frame();
 

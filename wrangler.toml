@@ -1,3 +1,7 @@
 name = "maximum-horsage"
 compatibility_date = "2026-09-06"
 pages_build_output_dir = "./dist"
+
+[[kv_namespaces]]
+binding = "KING"
+id = "3bcf5d445b26412dbe1bf8df692c9e62"

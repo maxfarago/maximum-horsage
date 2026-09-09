@@ -112,6 +112,8 @@
   #expr em{font-style:normal;opacity:.45;margin:0 5px}
   .seedline{margin-top:16px;font-size:12px;font-weight:500;opacity:.5}
   .seedline a{color:inherit}
+  #kingline,#kingend{opacity:.85}
+  #kingline b,#kingend b{color:var(--pop);font-weight:700}
   .devnote{margin-top:10px;font-size:12px;font-weight:600;color:var(--pop)}
   .hidden{display:none!important}
 
