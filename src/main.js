@@ -677,12 +677,38 @@ var KIT = [
     return g;}}
 ];
 
-var WSUM = 0, i0;
-for (i0=0;i0<KIT.length;i0++) WSUM += KIT[i0].w;
-function pickRecipe(){
-  var r = rnd()*WSUM;
-  for (var i=0;i<KIT.length;i++){ r -= KIT[i].w; if (r<=0) return KIT[i]; }
-  return KIT[0];
+function recipeMid(rec){ return (rec.size[0] + rec.size[1]) * 0.5; }
+
+// static mix for the 3-minute bowl. crumbs/snacks carpet the field; later bands keep recipe zones.
+var BANDS = [
+  {lo:0,    hi:0.40, n:280, ring:[0, 110]},
+  {lo:0.40, hi:1.20, n:320, ring:[0, 100]},
+  {lo:1.20, hi:4.00, n:250, ring:null},
+  {lo:4.00, hi:8.00, n:160, ring:null},
+  {lo:8.00, hi:99,   n:90,  ring:null}
+];
+
+function pickRecipeForBand(lo, hi){
+  var pool = [], wt = [], sum = 0, i, rec, mid, r, w;
+  for (i=0;i<KIT.length;i++){
+    rec = KIT[i];
+    mid = recipeMid(rec);
+    if (mid >= lo && mid <= hi){ pool.push(rec); wt.push(rec.w); sum += rec.w; }
+  }
+  if (!pool.length){
+    for (i=0;i<KIT.length;i++){
+      rec = KIT[i];
+      mid = recipeMid(rec);
+      w = rec.w / (1 + Math.abs(mid - (lo + hi) * 0.5));
+      pool.push(rec); wt.push(w); sum += w;
+    }
+  }
+  r = rnd() * sum;
+  for (i=0;i<pool.length;i++){
+    r -= wt[i];
+    if (r <= 0) return pool[i];
+  }
+  return pool[0];
 }
 
 // ---------------------------------------------------------------- hands
@@ -748,23 +774,38 @@ function placeProp(g, size, name, hp, extra){
   return g;
 }
 
+function spawnOne(rec, band){
+  var slo = Math.max(rec.size[0], band.lo);
+  var shi = Math.min(rec.size[1], band.hi);
+  if (slo > shi){ slo = rec.size[0]; shi = rec.size[1]; }
+  var s = slo + rnd()*(shi-slo);
+  var g = rec.make(s, hue());
+  var ring = band.ring;
+  var lo = ring ? ring[0] : rec.zone[0];
+  var hi = ring ? ring[1] : rec.zone[1];
+  var d = lo + Math.sqrt(rnd())*(hi-lo);
+  var a = rnd()*Math.PI*2;
+  g.position.set(Math.cos(a)*d, 0, Math.sin(a)*d);
+  g.rotation.y = rnd()*Math.PI*2;
+  placeProp(g, s, rec.name, rec.hp || 0, rec);
+  return rec.trojan;
+}
+
 function spawnWorld(count){
   var hadTrojan = false;
-  for (var i=0;i<count;i++){
-    var rec = pickRecipe();
-    var s = rec.size[0] + rnd()*(rec.size[1]-rec.size[0]);
-    var g = rec.make(s, hue());
-    var lo = rec.zone[0], hi = rec.zone[1];
-    var d = lo + Math.sqrt(rnd())*(hi-lo);
-    var a = rnd()*Math.PI*2;
-    g.position.set(Math.cos(a)*d, 0, Math.sin(a)*d);
-    g.rotation.y = rnd()*Math.PI*2;
-    if (rec.trojan) hadTrojan = true;
-    placeProp(g, s, rec.name, rec.hp || 0, rec);
+  var total = 0, b, i, rec, n, scale;
+  for (b=0;b<BANDS.length;b++) total += BANDS[b].n;
+  scale = count / total;
+  for (b=0;b<BANDS.length;b++){
+    n = Math.round(BANDS[b].n * scale);
+    for (i=0;i<n;i++){
+      rec = pickRecipeForBand(BANDS[b].lo, BANDS[b].hi);
+      if (spawnOne(rec, BANDS[b])) hadTrojan = true;
+    }
   }
   if (!hadTrojan){
-    var rec = null;
-    for (var k=0;k<KIT.length;k++) if (KIT[k].trojan){ rec = KIT[k]; break; }
+    rec = null;
+    for (i=0;i<KIT.length;i++) if (KIT[i].trojan){ rec = KIT[i]; break; }
     if (rec){
       var s = rec.size[0] + rnd()*(rec.size[1]-rec.size[0]);
       var g = rec.make(s, hue());
@@ -1763,7 +1804,21 @@ window.__mh = function(){
     dpr: renderer.getPixelRatio(),
     props: props.length,
     cx: +camera.position.x.toFixed(5),
-    cz: +camera.position.z.toFixed(5)
+    cz: +camera.position.z.toFixed(5),
+    mix: (function(){
+      var n = [0,0,0,0,0], rad = [0,0,0,0,0], i, s, b, r;
+      for (i=0;i<props.length;i++){
+        s = props[i].userData.size;
+        r = Math.hypot(props[i].position.x, props[i].position.z);
+        if (s < 0.4) b=0;
+        else if (s < 1.2) b=1;
+        else if (s < 4) b=2;
+        else if (s < 8) b=3;
+        else b=4;
+        n[b]++; rad[b]+=r;
+      }
+      return {n:n, r:rad.map(function(v,i){ return n[i] ? +(v/n[i]).toFixed(1) : 0; })};
+    })()
   };
 };
 
