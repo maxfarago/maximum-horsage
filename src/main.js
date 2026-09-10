@@ -1027,10 +1027,10 @@ var KIT = [
 
 function recipeMid(rec){ return (rec.size[0] + rec.size[1]) * 0.5; }
 
-// static mix for the 3-minute bowl. crumbs/snacks carpet the field; later bands keep recipe zones.
+// static mix for the 3-minute bowl. crumbs/snacks stay near spawn; later bands keep recipe zones.
 var BANDS = [
-  {lo:0,    hi:0.40, n:280, ring:[0, 110]},
-  {lo:0.40, hi:1.20, n:320, ring:[0, 100]},
+  {lo:0,    hi:0.40, n:280, ring:[0, 40]},
+  {lo:0.40, hi:1.20, n:320, ring:[0, 50]},
   {lo:1.20, hi:4.00, n:250, ring:null},
   {lo:4.00, hi:8.00, n:160, ring:null},
   {lo:8.00, hi:99,   n:90,  ring:null}
