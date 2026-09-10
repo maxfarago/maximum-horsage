@@ -502,6 +502,8 @@ function quadruped(s, hide, mane, legK){
   turn(g, box(hide, s*0.13, s*0.36, s*0.20, s*0.29,  y+s*0.17,  0), 0,0,-0.42); // neck
   g.add(box(hide, s*0.21, s*0.13, s*0.14,  s*0.43,   y+s*0.31,  0));       // head
   g.add(box(hide, s*0.10, s*0.10, s*0.11,  s*0.51,   y+s*0.27,  0));       // muzzle
+  g.add(sph(DARK, s*0.018, s*0.50, y+s*0.34, -s*0.055));
+  g.add(sph(DARK, s*0.018, s*0.50, y+s*0.34,  s*0.055));
   g.add(con(hide, s*0.026, s*0.08, s*0.36, y+s*0.41, -s*0.04));
   g.add(con(hide, s*0.026, s*0.08, s*0.36, y+s*0.41,  s*0.04));            // ears
   g.add(box(mane, s*0.05, s*0.28, s*0.14,  s*0.32,   y+s*0.26, 0));        // mane
@@ -528,21 +530,30 @@ var KIT = [
     var g=new THREE.Group();
     g.add(sph(0x33383f, s*0.4, 0, s*0.5, 0));
     g.add(sph(0x6f5a3a, s*0.28, s*0.34, s*0.54, 0));
+    g.add(sph(0xe9573f, s*0.09, s*0.48, s*0.60,  s*0.12));
+    g.add(sph(0xe9573f, s*0.09, s*0.48, s*0.60, -s*0.12));
     turn(g, box(0xdfeef7, s*0.7, s*0.03, s*0.26, -s*0.1, s*0.72,  s*0.22), 0,0,0.2);
     turn(g, box(0xdfeef7, s*0.7, s*0.03, s*0.26, -s*0.1, s*0.72, -s*0.22), 0,0,0.2);
     return g;}},
   {name:"thumbtack", size:[0.14,0.2], w:6, zone:[0,26], make:function(s){
     var g=new THREE.Group();
-    g.add(cyl(0xd94f4f, s*0.5, s*0.25, 0, s*0.13, 0));
-    g.add(cyl(STEEL, s*0.08, s*0.5, 0, -s*0.1, 0));
+    g.add(cyl(0xd94f4f, s*0.48, s*0.10, 0, s*0.20, 0));
+    g.add(cyl(0xf2c9c9, s*0.28, s*0.05, 0, s*0.26, 0));
+    g.add(cyl(STEEL, s*0.06, s*0.36, 0, 0, 0));
+    g.add(con(STEEL, s*0.06, s*0.14, 0, -s*0.24, 0));
     return g;}},
   {name:"sugar cube", size:[0.16,0.22], w:11, zone:[0,26], make:function(s){
     var g=new THREE.Group();
     g.add(box(0xfdf9ef, s, s, s, 0, s*0.5, 0));
+    g.add(box(0xe4dcc8, s*1.02, s*0.06, s*1.02, 0, s*0.5, 0));
+    g.add(box(0xe4dcc8, s*0.06, s*1.02, s*1.02, 0, s*0.5, 0));
     return g;}},
   {name:"coin", size:[0.18,0.26], w:7, zone:[0,26], make:function(s){
     var g=new THREE.Group();
-    g.add(cyl(0xffd23f, s*0.5, s*0.12, 0, s*0.06, 0));
+    g.add(cyl(0xe0a82e, s*0.5, s*0.10, 0, s*0.05, 0));
+    g.add(cyl(0xffd23f, s*0.36, s*0.12, 0, s*0.06, 0));
+    g.add(box(0xe0a82e, s*0.18, s*0.03, s*0.07, 0, s*0.13, 0));
+    g.add(box(0xe0a82e, s*0.07, s*0.03, s*0.18, 0, s*0.13, 0));
     return g;}},
   {name:"horse chestnut", size:[0.18,0.26], w:8, zone:[0,28], make:function(s){
     var g=new THREE.Group();
@@ -556,24 +567,34 @@ var KIT = [
   {name:"candy", size:[0.2,0.3], w:6, zone:[0,26], make:function(s,c){
     var g=new THREE.Group();
     g.add(box(c, s*0.55, s*0.5, s*0.5, 0, s*0.25, 0));
-    g.add(con(c, s*0.2, s*0.3, s*0.42, s*0.25, 0));
-    turn(g, con(c, s*0.2, s*0.3, -s*0.42, s*0.25, 0), 0, 0, Math.PI);
+    g.add(box(0xf7f2e4, s*0.58, s*0.14, s*0.52, 0, s*0.25, 0));
+    g.add(con(0xf7f2e4, s*0.2, s*0.32, s*0.44, s*0.25, 0));
+    turn(g, con(0xf7f2e4, s*0.2, s*0.32, -s*0.44, s*0.25, 0), 0, 0, Math.PI);
     return g;}},
   {name:"die", size:[0.24,0.32], w:5, zone:[0,28], make:function(s){
     var g=new THREE.Group();
+    var p=s*0.09, o=s*0.22;
     g.add(box(0xf7f2e4, s, s, s, 0, s*0.5, 0));
-    g.add(sph(DARK, s*0.09, 0, s*0.5, s*0.51));
+    g.add(box(DARK, p, p, s*0.05, 0, s*0.5, s*0.51));
+    g.add(box(DARK, s*0.05, p, p, s*0.51, s*0.5+o, o));
+    g.add(box(DARK, s*0.05, p, p, s*0.51, s*0.5-o, -o));
+    g.add(box(DARK, p, s*0.05, p, -o, s*1.02, -o));
+    g.add(box(DARK, p, s*0.05, p, 0, s*1.02, 0));
+    g.add(box(DARK, p, s*0.05, p, o, s*1.02, o));
     return g;}},
   {name:"horseshoe", size:[0.26,0.36], w:9, zone:[0,30], make:function(s){
     var g=new THREE.Group();
     for (var i=0;i<7;i++){
       var a = -0.5 + (i/6)*4.1;
       g.add(box(STEEL, s*0.16, s*0.1, s*0.16, Math.cos(a)*s*0.38, s*0.05, Math.sin(a)*s*0.38));
+      if (i%2===0) g.add(box(DARK, s*0.05, s*0.04, s*0.05, Math.cos(a)*s*0.38, s*0.11, Math.sin(a)*s*0.38));
     }
     return g;}},
   {name:"eraser", size:[0.28,0.4], w:5, zone:[0,28], make:function(s,c){
     var g=new THREE.Group();
     g.add(box(c, s, s*0.35, s*0.45, 0, s*0.17, 0));
+    g.add(box(0xf4efe2, s*0.40, s*0.38, s*0.48, 0, s*0.17, 0));
+    g.add(box(0xe9573f, s*0.18, s*0.04, s*0.50, 0, s*0.17, 0));
     return g;}},
   {name:"seahorse", size:[0.3,0.44], w:5, zone:[0,40], make:function(s){
     var g=new THREE.Group();
@@ -606,13 +627,20 @@ var KIT = [
     return g;}},
   {name:"horsehair brush", size:[0.36,0.5], w:6, zone:[0,42], make:function(s){
     var g=new THREE.Group();
-    g.add(box(0x9a6b4f, s*0.9, s*0.20, s*0.36, 0, s*0.26, 0));
+    g.add(box(0x9a6b4f, s*0.9, s*0.16, s*0.30, 0, s*0.32, 0));
+    g.add(box(BRASS, s*0.88, s*0.06, s*0.34, 0, s*0.21, 0));
     g.add(box(0x3a2a1a, s*0.84, s*0.18, s*0.32, 0, s*0.09, 0));
+    g.add(box(0x2a1c12, s*0.12, s*0.16, s*0.34, -s*0.18, s*0.09, 0));
+    g.add(box(0x2a1c12, s*0.12, s*0.16, s*0.34,  s*0.18, s*0.09, 0));
+    g.add(sph(DARK, s*0.055, -s*0.34, s*0.32, 0));
     return g;}},
   {name:"pencil", size:[0.4,0.6], w:5, zone:[0,30], make:function(s){
     var g=new THREE.Group();
-    turn(g, cyl(0xffd23f, s*0.07, s*0.9, 0, s*0.07, 0), 0, 0, Math.PI/2);
-    turn(g, con(0xf1c8a0, s*0.07, s*0.16, s*0.52, s*0.07, 0), 0, 0, -Math.PI/2);
+    turn(g, cyl(0xffd23f, s*0.07, s*0.70, 0, s*0.07, 0), 0, 0, Math.PI/2);
+    turn(g, con(0xf1c8a0, s*0.07, s*0.16, s*0.42, s*0.07, 0), 0, 0, -Math.PI/2);
+    turn(g, con(DARK, s*0.028, s*0.08, s*0.52, s*0.07, 0), 0, 0, -Math.PI/2);
+    turn(g, cyl(STEEL, s*0.075, s*0.10, -s*0.40, s*0.07, 0), 0, 0, Math.PI/2);
+    turn(g, cyl(0xff8fc0, s*0.07, s*0.14, -s*0.50, s*0.07, 0), 0, 0, Math.PI/2);
     return g;}},
 
   // ---- yard
@@ -625,38 +653,59 @@ var KIT = [
   {name:"apple", size:[0.35,0.5], w:8, zone:[0,46], make:function(s){
     var g=new THREE.Group();
     g.add(sph(0xe9573f, s*0.45, 0, s*0.45, 0));
-    g.add(cyl(0x6b4a2f, s*0.05, s*0.3, 0, s*0.95, 0));
+    g.add(sph(0xf27a5c, s*0.16, s*0.18, s*0.58, s*0.18));
+    g.add(cyl(0x6b4a2f, s*0.035, s*0.20, 0, s*0.90, 0));
+    turn(g, box(0x4fa34a, s*0.22, s*0.04, s*0.12, s*0.12, s*0.94, 0), 0, 0, 0.45);
     return g;}},
   {name:"mug", size:[0.4,0.55], w:5, zone:[0,46], make:function(s,c){
     var g=new THREE.Group();
-    g.add(cyl(c, s*0.4, s*0.8, 0, s*0.4, 0));
-    g.add(box(c, s*0.12, s*0.35, s*0.1, s*0.44, s*0.45, 0));
+    g.add(cyl(c, s*0.4, s*0.70, 0, s*0.35, 0));
+    g.add(cyl(0x3a2418, s*0.32, s*0.08, 0, s*0.68, 0));
+    g.add(box(c, s*0.08, s*0.08, s*0.10, s*0.44, s*0.58, 0));
+    g.add(box(c, s*0.08, s*0.08, s*0.10, s*0.44, s*0.22, 0));
+    g.add(box(c, s*0.08, s*0.44, s*0.10, s*0.52, s*0.40, 0));
     return g;}},
   {name:"soda can", size:[0.4,0.55], w:5, zone:[0,48], make:function(s,c){
     var g=new THREE.Group();
-    g.add(cyl(c, s*0.32, s, 0, s*0.5, 0));
-    g.add(cyl(STEEL, s*0.33, s*0.08, 0, s*1.0, 0));
+    g.add(cyl(c, s*0.32, s*0.86, 0, s*0.49, 0));
+    g.add(cyl(STEEL, s*0.33, s*0.08, 0, s*0.94, 0));
+    g.add(cyl(STEEL, s*0.33, s*0.06, 0, s*0.04, 0));
+    g.add(cyl(0xf7f2e4, s*0.335, s*0.22, 0, s*0.50, 0));
+    g.add(cyl(DARK, s*0.338, s*0.04, 0, s*0.50, 0));
+    g.add(box(STEEL, s*0.10, s*0.03, s*0.06, s*0.05, s*1.00, 0));
     return g;}},
   {name:"book", size:[0.5,0.8], w:5, zone:[0,48], make:function(s,c){
     var g=new THREE.Group();
     g.add(box(c, s, s*0.22, s*0.75, 0, s*0.11, 0));
-    g.add(box(0xf7f2e4, s*0.94, s*0.16, s*0.7, s*0.03, s*0.11, 0));
+    g.add(box(0xf7f2e4, s*0.88, s*0.16, s*0.68, s*0.05, s*0.11, 0));
+    g.add(box(c, s*0.10, s*0.24, s*0.76, -s*0.46, s*0.12, 0));
+    g.add(box(BRASS, s*0.46, s*0.03, s*0.08, s*0.06, s*0.23, 0));
     return g;}},
   {name:"rubber duck", size:[0.4,0.6], w:4, zone:[0,50], make:function(s){
     var g=new THREE.Group();
     g.add(sph(0xffd23f, s*0.45, 0, s*0.42, 0));
     g.add(sph(0xffd23f, s*0.26, 0, s*0.85, s*0.2));
     turn(g, con(0xff8c1a, s*0.1, s*0.22, 0, s*0.85, s*0.44), Math.PI/2, 0, 0);
+    g.add(sph(0xf7f2e4, s*0.055, -s*0.09, s*0.92, s*0.38));
+    g.add(sph(0xf7f2e4, s*0.055,  s*0.09, s*0.92, s*0.38));
+    g.add(sph(DARK, s*0.028, -s*0.09, s*0.93, s*0.42));
+    g.add(sph(DARK, s*0.028,  s*0.09, s*0.93, s*0.42));
+    g.add(box(0xffc020, s*0.18, s*0.08, s*0.22, s*0.32, s*0.46, 0));
     return g;}},
   {name:"feed bucket", size:[0.55,0.8], w:7, zone:[0,52], make:function(s){
     var g=new THREE.Group();
     g.add(cyl(0x4a7ec4, s*0.4, s*0.7, 0, s*0.35, 0));
     g.add(cyl(0x2f5a95, s*0.43, s*0.09, 0, s*0.72, 0));
     g.add(sph(0xc9a227, s*0.3, 0, s*0.7, 0));
+    turn(g, box(STEEL, s*0.05, s*0.32, s*0.05, s*0.40, s*0.88, 0), 0,0,-0.55);
+    turn(g, box(STEEL, s*0.05, s*0.32, s*0.05, -s*0.40, s*0.88, 0), 0,0,0.55);
+    g.add(box(STEEL, s*0.62, s*0.05, s*0.05, 0, s*1.04, 0));
     return g;}},
   {name:"potted plant", size:[0.8,1.3], w:6, zone:[0,56], make:function(s){
     var g=new THREE.Group();
     g.add(cyl(0xc06a44, s*0.28, s*0.4, 0, s*0.2, 0));
+    g.add(cyl(0xa85a38, s*0.32, s*0.06, 0, s*0.40, 0));
+    g.add(cyl(0x5c4030, s*0.24, s*0.04, 0, s*0.36, 0));
     for (var i=0;i<4;i++){
       var a = i*1.57 + rnd();
       g.add(sph(0x4fa34a, s*0.22, Math.cos(a)*s*0.18, s*0.5+rnd()*s*0.3, Math.sin(a)*s*0.18));
@@ -665,6 +714,9 @@ var KIT = [
   {name:"hobby horse", size:[0.9,1.4], w:6, zone:[0,58], make:function(s){
     var g=new THREE.Group();
     g.add(cyl(0x9a6b4f, s*0.04, s*0.92, 0, s*0.46, 0));
+    g.add(cyl(0xf7f2e4, s*0.048, s*0.10, 0, s*0.28, 0));
+    g.add(cyl(0xe9573f, s*0.048, s*0.10, 0, s*0.50, 0));
+    g.add(box(0x9a6b4f, s*0.18, s*0.03, s*0.03, 0, s*0.10, 0));
     var h = buildHead();
     h.scale.setScalar(s*0.52);
     h.position.set(0, s*0.62, 0);
@@ -675,22 +727,27 @@ var KIT = [
   // ---- room-sized
   {name:"traffic cone", size:[1.0,1.5], w:6, zone:[4,80], make:function(s){
     var g=new THREE.Group();
-    g.add(box(0xe9573f, s*0.7, s*0.1, s*0.7, 0, s*0.05, 0));
-    g.add(con(0xe9573f, s*0.3, s*0.95, 0, s*0.52, 0));
-    g.add(cyl(0xf7f2e4, s*0.2, s*0.14, 0, s*0.6, 0));
+    g.add(box(0x3f4a57, s*0.74, s*0.08, s*0.74, 0, s*0.04, 0));
+    g.add(box(0xe9573f, s*0.7, s*0.08, s*0.7, 0, s*0.10, 0));
+    g.add(con(0xe9573f, s*0.3, s*0.95, 0, s*0.56, 0));
+    g.add(cyl(0xf7f2e4, s*0.22, s*0.10, 0, s*0.48, 0));
+    g.add(cyl(0xf7f2e4, s*0.14, s*0.08, 0, s*0.74, 0));
     return g;}},
   {name:"sawhorse", size:[1.2,1.8], w:7, zone:[4,80], make:function(s){
     var g=new THREE.Group();
-    g.add(box(0xc79a5e, s*0.9, s*0.09, s*0.12, 0, s*0.6, 0));
+    g.add(box(0xa67c45, s*0.9, s*0.09, s*0.12, 0, s*0.6, 0));
     var p=[[-1,-1],[1,-1],[-1,1],[1,1]];
     for (var i=0;i<4;i++)
       turn(g, box(0xc79a5e, s*0.07, s*0.66, s*0.07, p[i][0]*s*0.32, s*0.30, p[i][1]*s*0.14),
            p[i][1]*0.25, 0, -p[i][0]*0.18);
+    g.add(box(STEEL, s*0.12, s*0.04, s*0.16, -s*0.28, s*0.66, 0));
+    g.add(box(STEEL, s*0.12, s*0.04, s*0.16,  s*0.28, s*0.66, 0));
     return g;}},
   {name:"lawnmower", size:[1.3,1.9], w:6, hp:5, zone:[4,80], make:function(s,c){
     var g=new THREE.Group();
     g.add(box(c, s*0.7, s*0.22, s*0.52, 0, s*0.24, 0));
     g.add(box(0x33383f, s*0.26, s*0.20, s*0.30, s*0.06, s*0.44, 0));
+    g.add(box(0x3a2a1a, s*0.20, s*0.28, s*0.48, s*0.42, s*0.28, 0));
     turn(g, box(STEEL, s*0.05, s*0.62, s*0.05, -s*0.38, s*0.50, 0), 0,0,0.55);
     g.add(box(STEEL, s*0.05, s*0.05, s*0.34, -s*0.66, s*0.76, 0));
     var p=[[-1,-1],[1,-1],[-1,1],[1,1]];
@@ -700,7 +757,9 @@ var KIT = [
   {name:"chair", size:[1.3,2.0], w:6, zone:[4,80], make:function(s,c){
     var g=new THREE.Group(), t=s*0.07;
     g.add(box(c, s*0.6, t*1.4, s*0.6, 0, s*0.5, 0));
+    g.add(box(0xf4efe2, s*0.50, t*1.6, s*0.50, 0, s*0.52, 0));
     g.add(box(c, s*0.6, s*0.55, t*1.4, 0, s*0.78, -s*0.27));
+    g.add(box(0xf7f2e4, s*0.48, s*0.07, t*1.6, 0, s*0.96, -s*0.27));
     var p=[[-1,-1],[1,-1],[-1,1],[1,1]];
     for (var i=0;i<4;i++) g.add(box(c, t, s*0.5, t, p[i][0]*s*0.25, s*0.25, p[i][1]*s*0.25));
     return g;}},
@@ -719,13 +778,18 @@ var KIT = [
   {name:"trash can", size:[1.2,1.8], w:5, zone:[4,82], make:function(s){
     var g=new THREE.Group();
     g.add(cyl(0x5f6b7a, s*0.34, s*0.9, 0, s*0.45, 0));
-    g.add(cyl(0x3f4a57, s*0.38, s*0.1, 0, s*0.92, 0));
+    g.add(cyl(STEEL, s*0.36, s*0.05, 0, s*0.22, 0));
+    g.add(cyl(STEEL, s*0.36, s*0.05, 0, s*0.58, 0));
+    g.add(cyl(0x3f4a57, s*0.38, s*0.10, 0, s*0.92, 0));
+    g.add(box(STEEL, s*0.16, s*0.05, s*0.08, 0, s*1.00, 0));
     return g;}},
   {name:"hay bale", size:[1.4,2.1], w:8, zone:[6,84], make:function(s){
     var g=new THREE.Group();
     turn(g, cyl(0xd9b45a, s*0.42, s*0.9, 0, s*0.42, 0), 0, 0, Math.PI/2);
     turn(g, cyl(0xc39c3f, s*0.43, s*0.06, -s*0.44, s*0.42, 0), 0, 0, Math.PI/2);
     turn(g, cyl(0xc39c3f, s*0.43, s*0.06,  s*0.44, s*0.42, 0), 0, 0, Math.PI/2);
+    g.add(box(0x8a6b32, s*0.08, s*0.06, s*0.88, -s*0.16, s*0.84, 0));
+    g.add(box(0x8a6b32, s*0.08, s*0.06, s*0.88,  s*0.16, s*0.84, 0));
     return g;}},
   {name:"clotheshorse", size:[1.5,2.1], w:6, zone:[6,82], make:function(s,c){
     var g=new THREE.Group();
@@ -751,8 +815,11 @@ var KIT = [
   {name:"mailbox", size:[1.5,2.2], w:4, zone:[8,86], make:function(s){
     var g=new THREE.Group();
     g.add(cyl(0x6b4a2f, s*0.06, s*0.7, 0, s*0.35, 0));
+    g.add(box(0x5c3d24, s*0.16, s*0.08, s*0.16, 0, s*0.04, 0));
     g.add(box(0x2f6fa8, s*0.34, s*0.3, s*0.55, 0, s*0.85, 0));
     turn(g, cyl(0x2f6fa8, s*0.17, s*0.32, 0, s*1.0, 0), 0, 0, Math.PI/2);
+    g.add(box(0xe9573f, s*0.04, s*0.16, s*0.08, s*0.20, s*0.92, 0));
+    g.add(box(0xf7f2e4, s*0.10, s*0.08, s*0.02, 0, s*0.85, s*0.28));
     return g;}},
   {name:"bicycle", size:[1.8,2.4], w:4, zone:[8,86], make:function(s,c){
     var g=new THREE.Group();
@@ -760,6 +827,9 @@ var KIT = [
     turn(g, cyl(DARK, s*0.28, s*0.06,  s*0.3, s*0.28, 0), 0, 0, Math.PI/2);
     g.add(box(c, s*0.6, s*0.06, s*0.06, 0, s*0.42, 0));
     g.add(box(c, s*0.06, s*0.3, s*0.06, -s*0.28, s*0.5, 0));
+    g.add(box(c, s*0.06, s*0.26, s*0.06,  s*0.26, s*0.50, 0));
+    g.add(box(DARK, s*0.16, s*0.05, s*0.10, -s*0.28, s*0.68, 0));
+    g.add(box(DARK, s*0.05, s*0.05, s*0.28,  s*0.28, s*0.66, 0));
     return g;}},
   {name:"moped", size:[1.8,2.5], w:5, hp:8, zone:[8,86], make:function(s,c){
     var g=new THREE.Group();
@@ -769,13 +839,19 @@ var KIT = [
     g.add(box(0x33383f, s*0.24, s*0.13, s*0.22, -s*0.12, s*0.50, 0));
     turn(g, box(c, s*0.10, s*0.42, s*0.16, s*0.30, s*0.48, 0), 0,0,-0.25);
     g.add(box(DARK, s*0.05, s*0.05, s*0.40, s*0.36, s*0.66, 0));
+    g.add(sph(0xffe9a8, s*0.06, s*0.42, s*0.40, 0));
+    g.add(box(0xe9573f, s*0.04, s*0.04, s*0.08, -s*0.34, s*0.38, 0));
     return g;}},
   {name:"park bench", size:[2.2,3.2], w:5, zone:[10,90], make:function(s){
     var g=new THREE.Group();
-    g.add(box(0x9a6b4f, s, s*0.08, s*0.32, 0, s*0.24, 0));
-    g.add(box(0x9a6b4f, s, s*0.32, s*0.07, 0, s*0.42, -s*0.14));
+    for (var i=0;i<3;i++)
+      g.add(box(0x9a6b4f, s, s*0.04, s*0.08, 0, s*0.24, (i-1)*s*0.10));
+    g.add(box(0x9a6b4f, s, s*0.10, s*0.06, 0, s*0.52, -s*0.14));
+    g.add(box(0x9a6b4f, s, s*0.08, s*0.06, 0, s*0.38, -s*0.14));
     g.add(box(0x5f6b7a, s*0.07, s*0.24, s*0.3, -s*0.42, s*0.12, 0));
     g.add(box(0x5f6b7a, s*0.07, s*0.24, s*0.3,  s*0.42, s*0.12, 0));
+    g.add(box(0x5f6b7a, s*0.08, s*0.08, s*0.32, -s*0.42, s*0.28, 0));
+    g.add(box(0x5f6b7a, s*0.08, s*0.08, s*0.32,  s*0.42, s*0.28, 0));
     return g;}},
   {name:"carousel horse", size:[2.2,3.0], w:5, zone:[10,90], make:function(s){
     var g=new THREE.Group();
@@ -789,37 +865,56 @@ var KIT = [
     var g=new THREE.Group();
     g.add(box(0xf2ead4, s*0.08, s*0.9, s*0.08, -s*0.45, s*0.45, 0));
     g.add(box(0xf2ead4, s*0.08, s*0.9, s*0.08,  s*0.45, s*0.45, 0));
-    for (var i=0;i<3;i++)
-      g.add(box(0xe4d7ae, s*0.9, s*0.09, s*0.06, 0, s*0.3+i*s*0.22, 0));
+    g.add(box(0xe4d7ae, s*0.9, s*0.09, s*0.06, 0, s*0.30, 0));
+    g.add(box(0xe9573f, s*0.9, s*0.09, s*0.06, 0, s*0.52, 0));
+    g.add(box(0xe4d7ae, s*0.9, s*0.09, s*0.06, 0, s*0.74, 0));
+    g.add(box(0x4fc4ff, s*0.10, s*0.08, s*0.10, -s*0.45, s*0.94, 0));
+    g.add(box(0xe9573f, s*0.10, s*0.08, s*0.10,  s*0.45, s*0.94, 0));
     return g;}},
   {name:"dark horse", size:[2.6,3.6], w:3, hp:1, zone:[6,130], make:function(s){
-    return quadruped(s, 0x241d2e, 0x120e18, 1.05);}},
+    var g = quadruped(s, 0x241d2e, 0x120e18, 1.05);
+    var y = s*0.34*1.05 + s*0.16;
+    g.add(box(0xf7f2e4, s*0.05, s*0.08, s*0.03, s*0.48, y+s*0.34, 0));
+    return g;}},
 
   // ---- street-sized
   {name:"car", size:[3.5,5.0], w:7, hp:120, zone:[16,130], make:function(s,c){
     var g=new THREE.Group();
     g.add(box(c, s, s*0.22, s*0.42, 0, s*0.22, 0));
     g.add(box(c, s*0.5, s*0.2, s*0.38, -s*0.04, s*0.42, 0));
+    g.add(box(0x7ec8e8, s*0.36, s*0.14, s*0.40, -s*0.04, s*0.44, 0));
+    g.add(box(STEEL, s*0.08, s*0.06, s*0.10, s*0.48, s*0.24,  s*0.16));
+    g.add(box(STEEL, s*0.08, s*0.06, s*0.10, s*0.48, s*0.24, -s*0.16));
+    g.add(box(0xe9573f, s*0.04, s*0.05, s*0.08, -s*0.50, s*0.24,  s*0.16));
+    g.add(box(0xe9573f, s*0.04, s*0.05, s*0.08, -s*0.50, s*0.24, -s*0.16));
     var p=[[-1,-1],[1,-1],[-1,1],[1,1]];
     for (var i=0;i<4;i++)
       turn(g, cyl(DARK, s*0.1, s*0.07, p[i][0]*s*0.33, s*0.1, p[i][1]*s*0.21), Math.PI/2, 0, 0);
     return g;}},
   {name:"police horse", size:[3.5,5.0], w:5, hp:1, zone:[16,130], make:function(s){
     var g = quadruped(s, 0x4a3524, 0x2a1c12, 1.1);
+    var y = s*0.34*1.1 + s*0.16;
+    g.add(box(0xf7f2e4, s*0.22, s*0.04, s*0.28, 0, y+s*0.16, 0));
+    g.add(box(0x2f3f6b, s*0.08, s*0.05, s*0.30, 0, y+s*0.18, 0));
     rider(g, s, s*0.62, 0x2f3f6b, 0x1b2440);
     return g;}},
   {name:"lamppost", size:[4.5,6.5], w:4, zone:[16,130], make:function(s){
     var g=new THREE.Group();
+    g.add(cyl(0x3f4a57, s*0.10, s*0.08, 0, s*0.04, 0));
     g.add(cyl(0x3f4a57, s*0.05, s*0.9, 0, s*0.45, 0));
-    g.add(box(0x3f4a57, s*0.2, s*0.05, s*0.05, s*0.1, s*0.9, 0));
-    g.add(sph(0xffe9a8, s*0.09, s*0.19, s*0.86, 0));
+    g.add(box(0x3f4a57, s*0.22, s*0.04, s*0.05, s*0.12, s*0.92, 0));
+    g.add(con(0x3f4a57, s*0.08, s*0.06, s*0.22, s*0.90, 0));
+    g.add(sph(0xffe9a8, s*0.10, s*0.22, s*0.82, 0));
     return g;}},
   {name:"tractor", size:[4.5,6.5], w:4, hp:95, zone:[20,130], make:function(s,c){
     var g=new THREE.Group();
     g.add(box(c, s*0.68, s*0.26, s*0.40, s*0.02, s*0.34, 0));
     g.add(box(c, s*0.28, s*0.26, s*0.34, s*0.30, s*0.52, 0));
     g.add(box(0x2b2140, s*0.26, s*0.22, s*0.36, -s*0.16, s*0.58, 0));
+    g.add(box(DARK, s*0.04, s*0.16, s*0.28, s*0.36, s*0.34, 0));
     g.add(cyl(0x33383f, s*0.05, s*0.24, s*0.30, s*0.74, 0));
+    g.add(sph(0xffe9a8, s*0.05, s*0.40, s*0.40,  s*0.18));
+    g.add(sph(0xffe9a8, s*0.05, s*0.40, s*0.40, -s*0.18));
     for (var k=-1;k<=1;k+=2){
       turn(g, cyl(DARK, s*0.28, s*0.12, -s*0.22, s*0.28, k*s*0.24), Math.PI/2,0,0);
       turn(g, cyl(DARK, s*0.15, s*0.10,  s*0.34, s*0.15, k*s*0.22), Math.PI/2,0,0);
@@ -827,23 +922,31 @@ var KIT = [
     return g;}},
   {name:"tree", size:[5,9], w:8, zone:[14,130], make:function(s){
     var g=new THREE.Group();
-    g.add(cyl(0x7a5636, s*0.07, s*0.5, 0, s*0.25, 0));
-    g.add(sph(0x3f8f3f, s*0.3, 0, s*0.62, 0));
-    g.add(sph(0x4fa34a, s*0.22, s*0.18, s*0.78, s*0.1));
-    g.add(sph(0x35803a, s*0.2, -s*0.16, s*0.72, -s*0.12));
+    g.add(cyl(0x6a4828, s*0.12, s*0.10, 0, s*0.05, 0));
+    g.add(cyl(0x7a5636, s*0.08, s*0.52, 0, s*0.26, 0));
+    g.add(sph(0x3f8f3f, s*0.32, 0, s*0.64, 0));
+    g.add(sph(0x4fa34a, s*0.24, s*0.20, s*0.82, s*0.12));
+    g.add(sph(0x35803a, s*0.22, -s*0.18, s*0.76, -s*0.14));
+    g.add(sph(0x2e6e32, s*0.18, s*0.06, s*0.90, -s*0.10));
+    g.add(sph(0xe9573f, s*0.05, s*0.22, s*0.70, s*0.16));
     return g;}},
   {name:"horse float", size:[5.5,8], w:4, zone:[20,130], make:function(s,c){
     var g=new THREE.Group();
     g.add(box(c, s*0.8, s*0.5, s*0.42, 0, s*0.42, 0));
+    g.add(box(0x9fdcf5, s*0.22, s*0.16, s*0.44, s*0.08, s*0.54, 0));
     g.add(box(0x9a6b4f, s*0.06, s*0.42, s*0.36, -s*0.42, s*0.3, 0));
     g.add(box(0x3f4a57, s*0.3, s*0.06, s*0.08, s*0.55, s*0.24, 0));
-    for (var k=-1;k<=1;k+=2)
-      turn(g, cyl(DARK, s*0.1, s*0.08, -s*0.1, s*0.1, k*s*0.21), Math.PI/2, 0, 0);
+    g.add(box(0xe9573f, s*0.04, s*0.04, s*0.08, s*0.42, s*0.22, s*0.18));
+    for (var k=-1;k<=1;k+=2){
+      turn(g, cyl(DARK, s*0.1, s*0.08, -s*0.18, s*0.1, k*s*0.21), Math.PI/2, 0, 0);
+      turn(g, cyl(DARK, s*0.1, s*0.08,  s*0.18, s*0.1, k*s*0.21), Math.PI/2, 0, 0);
+    }
     return g;}},
   {name:"equestrian statue", size:[6,9], w:4, zone:[26,130], make:function(s){
     var g=new THREE.Group();
     g.add(box(0x8d8577, s*0.72, s*0.22, s*0.44, 0, s*0.11, 0));
     g.add(box(0xa39a89, s*0.62, s*0.10, s*0.36, 0, s*0.27, 0));
+    g.add(box(BRASS, s*0.22, s*0.08, s*0.02, 0, s*0.18, s*0.23));
     var q = quadruped(s*0.78, BRONZE, BRONZE, 1.0);
     q.position.y = s*0.32;
     g.add(q);
@@ -853,14 +956,23 @@ var KIT = [
     var g=new THREE.Group();
     g.add(box(c, s, s*0.45, s*0.42, 0, s*0.35, 0));
     g.add(box(0xf7f2e4, s*0.28, s*0.3, s*0.4, -s*0.42, s*0.28, 0));
+    g.add(box(0xe9573f, s*0.36, s*0.06, s*0.46, -s*0.42, s*0.46, 0));
     g.add(box(DARK, s*0.5, s*0.16, s*0.44, s*0.1, s*0.42, 0));
+    g.add(box(0xffd23f, s*0.40, s*0.10, s*0.44, s*0.12, s*0.62, 0));
     for (var k=-1;k<=1;k+=2)
-      turn(g, cyl(DARK, s*0.11, s*0.09, s*0.3*k, s*0.11, s*0.21), Math.PI/2, 0, 0);
+      for (var j=-1;j<=1;j+=2)
+        turn(g, cyl(DARK, s*0.11, s*0.09, s*0.3*k, s*0.11, j*s*0.21), Math.PI/2, 0, 0);
     return g;}},
   {name:"high horse", size:[7,11], w:3, hp:1, zone:[30,130], make:function(s){
-    return quadruped(s*0.72, 0xdcc9a8, 0x8a6f45, 3.4);}},
+    var g = quadruped(s*0.72, 0xdcc9a8, 0x8a6f45, 3.4);
+    var y = s*0.72*0.34*3.4 + s*0.72*0.16;
+    g.add(box(0x8a2a1a, s*0.20, s*0.05, s*0.22, 0, y + s*0.72*0.16, 0));
+    return g;}},
   {name:"trojan horse", size:[7.5,10], w:5, hp:1, trojan:true, zone:[18,90], make:function(s){
     var g = quadruped(s, 0xc4a574, 0x5c3d24, 1.2);
+    var y = s*0.34*1.2 + s*0.16;
+    g.add(box(0x5c3d24, s*0.16, s*0.18, s*0.04, 0, y, s*0.14));
+    g.add(box(BRASS, s*0.04, s*0.04, s*0.04, s*0.06, y, s*0.16));
     turn(g, cyl(0x6b4a2f, s*0.12, s*0.08,  s*0.22, s*0.08,  s*0.16), Math.PI/2,0,0);
     turn(g, cyl(0x6b4a2f, s*0.12, s*0.08,  s*0.22, s*0.08, -s*0.16), Math.PI/2,0,0);
     turn(g, cyl(0x6b4a2f, s*0.12, s*0.08, -s*0.22, s*0.08,  s*0.16), Math.PI/2,0,0);
@@ -872,13 +984,18 @@ var KIT = [
     turn(g, con(0xf2ead4, s*0.6, s*0.34, 0, s*0.66, 0), 0, Math.PI/4, 0);
     g.add(box(0x6b4a2f, s*0.2, s*0.3, s*0.03, -s*0.2, s*0.15, s*0.31));
     g.add(box(0x6b4a2f, s*0.2, s*0.3, s*0.03,  s*0.2, s*0.15, s*0.31));
+    g.add(box(0x9fdcf5, s*0.14, s*0.14, s*0.03, 0, s*0.34, s*0.31));
+    g.add(box(0x7a3a32, s*0.10, s*0.18, s*0.10, s*0.22, s*0.82, -s*0.08));
     return g;}},
   {name:"house", size:[9,15], w:6, zone:[30,130], make:function(s,c){
     var g=new THREE.Group();
     g.add(box(c, s*0.8, s*0.55, s*0.7, 0, s*0.27, 0));
     turn(g, con(0xc0503f, s*0.62, s*0.4, 0, s*0.74, 0), 0, Math.PI/4, 0);
     g.add(box(0x6b4a2f, s*0.14, s*0.26, s*0.03, 0, s*0.13, s*0.36));
+    g.add(box(0x5c3d24, s*0.20, s*0.04, s*0.08, 0, s*0.02, s*0.38));
     g.add(box(0x9fdcf5, s*0.14, s*0.14, s*0.03, -s*0.26, s*0.34, s*0.36));
+    g.add(box(0x9fdcf5, s*0.14, s*0.14, s*0.03,  s*0.26, s*0.34, s*0.36));
+    g.add(box(0x7a3a32, s*0.12, s*0.22, s*0.12, s*0.22, s*0.84, -s*0.08));
     return g;}},
   {name:"carousel", size:[9,14], w:3, hp:15, zone:[40,130], make:function(s){
     var g=new THREE.Group();
@@ -902,15 +1019,18 @@ var KIT = [
     g.add(box(c, s*0.55, s, s*0.55, 0, s*0.5, 0));
     for (var i=0;i<5;i++)
       g.add(box(0x9fdcf5, s*0.5, s*0.07, s*0.56, 0, s*0.16+i*s*0.17, 0));
+    g.add(box(DARK, s*0.55, s*0.10, s*0.56, 0, s*0.05, 0));
+    g.add(box(0x6b4a2f, s*0.12, s*0.16, s*0.04, 0, s*0.10, s*0.28));
+    g.add(cyl(STEEL, s*0.02, s*0.16, s*0.12, s*1.06, 0));
     return g;}}
 ];
 
 function recipeMid(rec){ return (rec.size[0] + rec.size[1]) * 0.5; }
 
-// static mix for the 3-minute bowl. crumbs/snacks carpet the field; later bands keep recipe zones.
+// static mix for the 3-minute bowl. crumbs/snacks stay near spawn; later bands keep recipe zones.
 var BANDS = [
-  {lo:0,    hi:0.40, n:280, ring:[0, 110]},
-  {lo:0.40, hi:1.20, n:320, ring:[0, 100]},
+  {lo:0,    hi:0.40, n:280, ring:[0, 40]},
+  {lo:0.40, hi:1.20, n:320, ring:[0, 50]},
   {lo:1.20, hi:4.00, n:250, ring:null},
   {lo:4.00, hi:8.00, n:160, ring:null},
   {lo:8.00, hi:99,   n:90,  ring:null}
