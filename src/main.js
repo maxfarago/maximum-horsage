@@ -69,7 +69,7 @@ renderer.shadowMap.type = THREE.BasicShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 document.body.appendChild(renderer.domElement);
 
-var SKY_FOG     = 0x58b4e4;
+var SKY_FOG     = 0xf2ddb0;
 var SUN_LIGHT   = new THREE.Vector3(22, 55, -30);
 var SUN_VIEW    = new THREE.Vector3(8, 12, -45).normalize();
 
@@ -92,56 +92,51 @@ scene.add(sun.target);
 
 // ---------------------------------------------------------------- ground
 function groundTexture(){
-  var s = 1024, i, k, n, cx, cy, r, a, rr, px, py, ox, oz;
+  var s = 1024, i, x, y, len, rot, dx, dy, ox, oz;
   var c = document.createElement("canvas"); c.width = c.height = s;
   var g = c.getContext("2d");
-  g.fillStyle = "#7ac853"; g.fillRect(0,0,s,s);
-  function parcel(fill, stroke, count, r0, r1){
-    for (i=0;i<count;i++){
-      cx = trnd()*s; cy = trnd()*s;
-      r = r0 + trnd()*(r1-r0);
-      n = 5 + (trnd()*4)|0;
+  g.fillStyle = "#82cd4c";
+  g.fillRect(0,0,s,s);
+  g.lineCap = "round";
+  function blades(color, alpha, n, w, l0, l1){
+    g.strokeStyle = color;
+    g.globalAlpha = alpha;
+    g.lineWidth = w;
+    for (i=0;i<n;i++){
+      x = trnd()*s;
+      y = trnd()*s;
+      len = l0 + trnd()*(l1-l0);
+      rot = -0.22 + trnd()*0.44;
+      dx = Math.sin(rot)*len;
+      dy = -Math.cos(rot)*len;
       g.beginPath();
-      for (k=0;k<n;k++){
-        a = (k/n)*6.283 + trnd()*0.35;
-        rr = r * (0.62 + trnd()*0.5);
-        px = cx + Math.cos(a)*rr;
-        py = cy + Math.sin(a)*rr;
-        if (k===0) g.moveTo(px, py); else g.lineTo(px, py);
-      }
-      g.closePath();
-      for (ox=-1;ox<=1;ox++) for (oz=-1;oz<=1;oz++){
-        g.save();
-        g.translate(ox*s, oz*s);
-        g.fillStyle = fill;
-        g.fill();
-        if (stroke){
-          g.strokeStyle = stroke;
-          g.lineWidth = 7;
+      g.moveTo(x, y);
+      g.lineTo(x+dx, y+dy);
+      g.stroke();
+      if (x < len || y < len || x > s-len || y > s-len){
+        for (ox=-1;ox<=1;ox++) for (oz=-1;oz<=1;oz++){
+          if (!ox && !oz) continue;
+          g.beginPath();
+          g.moveTo(x+ox*s, y+oz*s);
+          g.lineTo(x+dx+ox*s, y+dy+oz*s);
           g.stroke();
         }
-        g.restore();
       }
     }
   }
-  parcel("#64b03e", null, 12, 90, 170);
-  parcel("#8bd45a", null, 10, 70, 140);
-  parcel("#58a038", null, 8, 55, 110);
-  parcel("#c2a24a", null, 4, 40, 80);
-  for (i=0;i<8000;i++){
-    g.fillStyle = trnd()<0.5 ? "rgba(255,255,255,.04)" : "rgba(0,0,0,.04)";
-    g.fillRect(trnd()*s, trnd()*s, 1+trnd()*2, 1+trnd()*2);
-  }
+  blades("#6fbb3c", 0.5, 13000, 1.15, 3, 6);
+  blades("#9edd63", 0.45, 10000, 1.0, 2.5, 5);
+  blades("#5da42f", 0.32, 6000, 1.0, 2, 4.5);
+  g.globalAlpha = 1;
   var t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(5, 5);
-  t.offset.set(0.17, 0.31);
+  t.repeat.set(96, 96);
   t.encoding = THREE.sRGBEncoding;
-  t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   return t;
 }
 var ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(WORLD*2.4, WORLD*2.4),
+  new THREE.CircleGeometry(WORLD * 8, 80),
   new THREE.MeshLambertMaterial({map:groundTexture()})
 );
 ground.rotation.x = -Math.PI/2;
@@ -153,13 +148,11 @@ function skyTexture(){
   var g = c.getContext("2d");
   var grd = g.createLinearGradient(0, 0, 0, 256);
   grd.addColorStop(0, "#1a72b0");
-  grd.addColorStop(0.38, "#2a86c4");
-  grd.addColorStop(0.44, "#3c9ed4");
-  grd.addColorStop(0.47, "#58b4e4");
-  grd.addColorStop(0.495, "#f2ddb0");
-  grd.addColorStop(0.515, "#f2ddb0");
-  grd.addColorStop(0.55, "#78c455");
-  grd.addColorStop(1, "#78c455");
+  grd.addColorStop(0.32, "#2f8fc8");
+  grd.addColorStop(0.40, "#4aa9dc");
+  grd.addColorStop(0.45, "#6ec0e8");
+  grd.addColorStop(0.49, "#f2ddb0");
+  grd.addColorStop(1, "#f2ddb0");
   g.fillStyle = grd;
   g.fillRect(0, 0, 8, 256);
   var t = new THREE.CanvasTexture(c);
@@ -168,20 +161,43 @@ function skyTexture(){
   t.minFilter = THREE.LinearFilter;
   return t;
 }
+var skyMat = new THREE.ShaderMaterial({
+  uniforms: {
+    map: { value: skyTexture() },
+    projInverse: { value: new THREE.Matrix4() },
+    viewInverse: { value: new THREE.Matrix4() }
+  },
+  vertexShader: [
+    "uniform mat4 projInverse;",
+    "uniform mat4 viewInverse;",
+    "varying vec3 vDir;",
+    "void main(){",
+    "  gl_Position = vec4(position.xy, 0.0, 1.0);",
+    "  vec4 view = projInverse * vec4(position.xy, 1.0, 1.0);",
+    "  view.xyz /= view.w;",
+    "  vDir = mat3(viewInverse) * view.xyz;",
+    "}"
+  ].join("\n"),
+  fragmentShader: [
+    "uniform sampler2D map;",
+    "varying vec3 vDir;",
+    "void main(){",
+    "  vec3 d = normalize(vDir);",
+    "  float v = 0.5 + 0.5 * d.y;",
+    "  gl_FragColor = texture2D(map, vec2(0.5, clamp(v, 0.0, 1.0)));",
+    "}"
+  ].join("\n"),
+  depthTest: false,
+  depthWrite: false,
+  fog: false
+});
+var sky = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), skyMat);
+sky.frustumCulled = false;
+sky.renderOrder = -2;
+scene.add(sky);
+
 var skyRoot = new THREE.Group();
 scene.add(skyRoot);
-
-var sky = new THREE.Mesh(
-  new THREE.SphereGeometry(420, 24, 16),
-  new THREE.MeshBasicMaterial({
-    map: skyTexture(),
-    side: THREE.BackSide,
-    depthWrite: false,
-    fog: false
-  })
-);
-sky.renderOrder = -2;
-skyRoot.add(sky);
 
 var sunMat = new THREE.MeshBasicMaterial({ color: 0xffe082, fog: false, depthWrite: false });
 var sunDisc = new THREE.Mesh(new THREE.SphereGeometry(36, 16, 12), sunMat);
@@ -1460,7 +1476,7 @@ function setRadius(r){
   core.scale.setScalar(r);
   scene.fog.near = 60 + r*9;
   scene.fog.far  = 230 + r*34;
-  camera.far = Math.max(scene.fog.far + 40, 520);
+  camera.far = Math.max(scene.fog.far + 80, 2500);
   camera.updateProjectionMatrix();
   var ext = Math.max(20, r*9);
   var sc = sun.shadow.camera;
@@ -1912,6 +1928,9 @@ function followSun(){
   sun.target.position.copy(katamari.position);
 }
 function placeSky(){
+  camera.updateMatrixWorld();
+  skyMat.uniforms.projInverse.value.copy(camera.projectionMatrixInverse);
+  skyMat.uniforms.viewInverse.value.copy(camera.matrixWorld);
   skyRoot.position.copy(camera.position);
 }
 
