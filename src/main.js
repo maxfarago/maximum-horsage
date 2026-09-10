@@ -69,9 +69,13 @@ renderer.shadowMap.type = THREE.BasicShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 document.body.appendChild(renderer.domElement);
 
+var SKY_FOG     = 0xf2ddb0;
+var SUN_LIGHT   = new THREE.Vector3(22, 55, -30);
+var SUN_VIEW    = new THREE.Vector3(8, 12, -45).normalize();
+
 var scene = new THREE.Scene();
-scene.background = new THREE.Color(0x7fd4f5);
-scene.fog = new THREE.Fog(0x7fd4f5, 60, 230);
+scene.background = new THREE.Color(SKY_FOG);
+scene.fog = new THREE.Fog(SKY_FOG, 60, 230);
 
 var camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.1, 700);
 
@@ -88,27 +92,158 @@ scene.add(sun.target);
 
 // ---------------------------------------------------------------- ground
 function groundTexture(){
-  var c = document.createElement("canvas"); c.width = c.height = 256;
+  var s = 1024, i, x, y, len, rot, dx, dy, ox, oz;
+  var c = document.createElement("canvas"); c.width = c.height = s;
   var g = c.getContext("2d");
-  g.fillStyle = "#78c455"; g.fillRect(0,0,256,256);
-  g.fillStyle = "#6cb84c"; g.fillRect(0,0,128,128); g.fillRect(128,128,128,128);
-  for (var i=0;i<900;i++){
-    g.fillStyle = trnd()<0.5 ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.05)";
-    g.fillRect(trnd()*256, trnd()*256, 3, 3);
+  g.fillStyle = "#82cd4c";
+  g.fillRect(0,0,s,s);
+  g.lineCap = "round";
+  function blades(color, alpha, n, w, l0, l1){
+    g.strokeStyle = color;
+    g.globalAlpha = alpha;
+    g.lineWidth = w;
+    for (i=0;i<n;i++){
+      x = trnd()*s;
+      y = trnd()*s;
+      len = l0 + trnd()*(l1-l0);
+      rot = -0.22 + trnd()*0.44;
+      dx = Math.sin(rot)*len;
+      dy = -Math.cos(rot)*len;
+      g.beginPath();
+      g.moveTo(x, y);
+      g.lineTo(x+dx, y+dy);
+      g.stroke();
+      if (x < len || y < len || x > s-len || y > s-len){
+        for (ox=-1;ox<=1;ox++) for (oz=-1;oz<=1;oz++){
+          if (!ox && !oz) continue;
+          g.beginPath();
+          g.moveTo(x+ox*s, y+oz*s);
+          g.lineTo(x+dx+ox*s, y+dy+oz*s);
+          g.stroke();
+        }
+      }
+    }
   }
+  blades("#6fbb3c", 0.5, 13000, 1.15, 3, 6);
+  blades("#9edd63", 0.45, 10000, 1.0, 2.5, 5);
+  blades("#5da42f", 0.32, 6000, 1.0, 2, 4.5);
+  g.globalAlpha = 1;
   var t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(230,230);
+  t.repeat.set(96, 96);
   t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = Math.min(8, renderer.capabilities.getMaxAnisotropy());
   return t;
 }
 var ground = new THREE.Mesh(
-  new THREE.PlaneGeometry(WORLD*2.4, WORLD*2.4),
+  new THREE.CircleGeometry(WORLD * 8, 80),
   new THREE.MeshLambertMaterial({map:groundTexture()})
 );
 ground.rotation.x = -Math.PI/2;
 ground.receiveShadow = true;
 scene.add(ground);
+
+function skyTexture(){
+  var c = document.createElement("canvas"); c.width = 8; c.height = 256;
+  var g = c.getContext("2d");
+  var grd = g.createLinearGradient(0, 0, 0, 256);
+  grd.addColorStop(0, "#1a72b0");
+  grd.addColorStop(0.32, "#2f8fc8");
+  grd.addColorStop(0.40, "#4aa9dc");
+  grd.addColorStop(0.45, "#6ec0e8");
+  grd.addColorStop(0.49, "#f2ddb0");
+  grd.addColorStop(1, "#f2ddb0");
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 8, 256);
+  var t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearFilter;
+  return t;
+}
+var skyMat = new THREE.ShaderMaterial({
+  uniforms: {
+    map: { value: skyTexture() },
+    projInverse: { value: new THREE.Matrix4() },
+    viewInverse: { value: new THREE.Matrix4() }
+  },
+  vertexShader: [
+    "uniform mat4 projInverse;",
+    "uniform mat4 viewInverse;",
+    "varying vec3 vDir;",
+    "void main(){",
+    "  gl_Position = vec4(position.xy, 0.0, 1.0);",
+    "  vec4 view = projInverse * vec4(position.xy, 1.0, 1.0);",
+    "  view.xyz /= view.w;",
+    "  vDir = mat3(viewInverse) * view.xyz;",
+    "}"
+  ].join("\n"),
+  fragmentShader: [
+    "uniform sampler2D map;",
+    "varying vec3 vDir;",
+    "void main(){",
+    "  vec3 d = normalize(vDir);",
+    "  float v = 0.5 + 0.5 * d.y;",
+    "  gl_FragColor = texture2D(map, vec2(0.5, clamp(v, 0.0, 1.0)));",
+    "}"
+  ].join("\n"),
+  depthTest: false,
+  depthWrite: false,
+  fog: false
+});
+var sky = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), skyMat);
+sky.frustumCulled = false;
+sky.renderOrder = -2;
+scene.add(sky);
+
+var skyRoot = new THREE.Group();
+scene.add(skyRoot);
+
+var sunMat = new THREE.MeshBasicMaterial({ color: 0xffe082, fog: false, depthWrite: false });
+var sunDisc = new THREE.Mesh(new THREE.SphereGeometry(36, 16, 12), sunMat);
+sunDisc.position.copy(SUN_VIEW).multiplyScalar(260);
+sunDisc.renderOrder = -1;
+skyRoot.add(sunDisc);
+
+var sunGlow = new THREE.Mesh(
+  new THREE.SphereGeometry(70, 12, 10),
+  new THREE.MeshBasicMaterial({
+    color: 0xffe08a,
+    fog: false,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.28
+  })
+);
+sunGlow.position.copy(SUN_VIEW).multiplyScalar(260);
+sunGlow.renderOrder = -1;
+skyRoot.add(sunGlow);
+
+var cloudMat = new THREE.MeshBasicMaterial({ color: 0xd8e4f0, fog: false, depthWrite: false });
+function addCloud(az, el, scale){
+  var g = new THREE.Group();
+  function slab(w, h, d, x, y, z, mat){
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat || cloudMat);
+    m.position.set(x, y, z);
+    g.add(m);
+  }
+  var shade = new THREE.MeshBasicMaterial({ color: 0xc5d3e4, fog: false, depthWrite: false });
+  slab(1.8, 0.7, 1.1, 0, 0, 0);
+  slab(1.2, 0.55, 0.9, 0.85, 0.12, 0.15);
+  slab(1.0, 0.5, 0.8, -0.75, 0.08, -0.1);
+  slab(0.8, 0.42, 0.7, 0.2, 0.28, -0.05, shade);
+  var dist = 160;
+  var ce = Math.cos(el), se = Math.sin(el);
+  g.position.set(Math.sin(az)*ce*dist, se*dist, -Math.cos(az)*ce*dist);
+  g.scale.setScalar(scale);
+  skyRoot.add(g);
+}
+addCloud(-0.22, 0.22, 48);
+addCloud(0.38, 0.26, 40);
+addCloud(-0.55, 0.18, 52);
+addCloud(0.7, 0.24, 44);
+addCloud(0.05, 0.32, 34);
+addCloud(-0.95, 0.2, 42);
 
 // ---------------------------------------------------------------- the ball
 function ballTexture(){
@@ -246,7 +381,7 @@ var rig     = new THREE.Group(); scene.add(rig);
 var headGrp = buildHead(); rig.add(headGrp);
 var tailGrp = buildTail(); rig.add(tailGrp);
 
-var rigYaw = 0, bobT = 0;
+var rigYaw = 0, bobT = 0, tailSpring = 0, tailVel = 0;
 function angLerp(a,b,t){
   var d = ((b - a + Math.PI*3) % (Math.PI*2)) - Math.PI;
   return a + d*t;
@@ -255,9 +390,10 @@ function updateRig(dt){
   bobT += dt;
   var hs = HEAD_K * Math.pow(radius, HEAD_POW);
   var sp = Math.sqrt(vel.x*vel.x + vel.z*vel.z);
+  var targetYaw = sp > 0.35 ? Math.atan2(vel.x, vel.z) : rigYaw;
 
   rig.position.copy(katamari.position);
-  if (sp > 0.35) rigYaw = angLerp(rigYaw, Math.atan2(vel.x, vel.z), 1 - Math.pow(0.0015, dt));
+  if (sp > 0.35) rigYaw = angLerp(rigYaw, targetYaw, 1 - Math.pow(0.0015, dt));
   rig.rotation.y = rigYaw;
 
   var gait = Math.min(1, sp / 5);
@@ -267,9 +403,20 @@ function updateRig(dt){
   headGrp.position.set(0, radius*0.30 + bob*radius*0.2, radius*1.05);
   headGrp.rotation.set(bob, 0, 0);
 
+  if (dt > 0){
+    var targetTail = -sp * 0.22 - (rigYaw - targetYaw) * 1.2;
+    tailVel += (targetTail - tailSpring) * 14 * dt;
+    tailVel *= Math.pow(0.84, dt * 60);
+    tailSpring += tailVel * dt;
+  }
+
   tailGrp.scale.setScalar(hs*0.95);
   tailGrp.position.set(0, radius*0.62, -radius*1.05);
-  tailGrp.rotation.set(0, 0, Math.sin(bobT*7) * 0.16 * gait);
+  tailGrp.rotation.set(
+    Math.sin(bobT*7) * 0.08 * gait,
+    tailSpring,
+    Math.sin(bobT*7) * 0.10 * gait
+  );
 }
 
 // ---------------------------------------------------------------- a horse, generally
@@ -1329,7 +1476,7 @@ function setRadius(r){
   core.scale.setScalar(r);
   scene.fog.near = 60 + r*9;
   scene.fog.far  = 230 + r*34;
-  camera.far = scene.fog.far + 40;
+  camera.far = Math.max(scene.fog.far + 80, 2500);
   camera.updateProjectionMatrix();
   var ext = Math.max(20, r*9);
   var sc = sun.shadow.camera;
@@ -1370,6 +1517,8 @@ function reset(){
   shake    = 0;
   rigYaw   = 0;
   bobT     = 0;
+  tailSpring = 0;
+  tailVel  = 0;
   nayAt    = 0;
   nayProp  = null;
 
@@ -1390,6 +1539,7 @@ function reset(){
   syncClock();
   updateRig(0);
   placeCamera(0, true);
+  placeSky();
 }
 
 // ---------------------------------------------------------------- collecting
@@ -1774,8 +1924,14 @@ function step(dt){
 }
 
 function followSun(){
-  sun.position.set(katamari.position.x + 30, 55, katamari.position.z + 22);
+  sun.position.copy(katamari.position).add(SUN_LIGHT);
   sun.target.position.copy(katamari.position);
+}
+function placeSky(){
+  camera.updateMatrixWorld();
+  skyMat.uniforms.projInverse.value.copy(camera.projectionMatrixInverse);
+  skyMat.uniforms.viewInverse.value.copy(camera.matrixWorld);
+  skyRoot.position.copy(camera.position);
 }
 
 var acc = 0;
@@ -1814,6 +1970,7 @@ function frame(){
   followSun();
   updateRig(dt);
   placeCamera(dt, false);
+  placeSky();
   renderer.render(scene, camera);
   popInterp();
 }
@@ -1905,6 +2062,7 @@ function showKing(k){
   applyFov();
   updateRig(0);
   placeCamera(0, true);
+  placeSky();
   syncHUD();
   stashPrev();
 }
