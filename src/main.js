@@ -443,8 +443,13 @@ function buildHead(){
 }
 function buildTail(){
   var g = new THREE.Group();
-  g.add(box(MANE, 0.16,0.16,0.18, 0, 0.10, 0.02));
-  turn(g, con(MANE, 0.15, 0.62, 0, -0.10, -0.20), 2.25, 0, 0);
+  g.add(box(MANE, 0.16,0.16,0.18, 0, 0.06, 0.04));
+  var hair = new THREE.Group();
+  hair.position.set(0, 0.02, -0.04);
+  turn(hair, con(MANE, 0.16, 0.46, 0, -0.02, -0.16), 1.95, 0, 0);
+  turn(hair, con(MANE, 0.10, 0.42, 0, -0.12, -0.50), 2.18, 0, 0);
+  g.add(hair);
+  g.userData.hair = hair;
   return g;
 }
 
@@ -453,6 +458,7 @@ var headGrp = buildHead(); rig.add(headGrp);
 var tailGrp = buildTail(); rig.add(tailGrp);
 
 var rigYaw = 0, bobT = 0, tailSpring = 0, tailVel = 0;
+var tailPitch = 0, tailPitchVel = 0, hairLag = 0, hairVel = 0;
 function angLerp(a,b,t){
   var d = ((b - a + Math.PI*3) % (Math.PI*2)) - Math.PI;
   return a + d*t;
@@ -469,25 +475,45 @@ function updateRig(dt){
 
   var gait = Math.min(1, sp / 5);
   var bob  = Math.sin(bobT*9) * 0.06 * gait;
+  var stream = Math.min(1, sp / 7.5);
+  var turnErr = sp > 0.35 ? ((rigYaw - targetYaw + Math.PI*3) % (Math.PI*2)) - Math.PI : 0;
+  var swish = Math.sin(bobT*9 + 0.7) * gait;
 
   headGrp.scale.setScalar(hs);
   headGrp.position.set(0, radius*0.30 + bob*radius*0.2, radius*1.05);
   headGrp.rotation.set(bob, 0, 0);
 
+  var wantPitch = 0.16*(1 - stream) - 0.22*stream + bob*0.28;
+  var wantYaw   = -turnErr*1.55 + swish*0.34;
+  var wantRoll  = swish*0.12;
   if (dt > 0){
-    var targetTail = -sp * 0.22 - (rigYaw - targetYaw) * 1.2;
-    tailVel += (targetTail - tailSpring) * 14 * dt;
-    tailVel *= Math.pow(0.84, dt * 60);
+    tailVel += (wantYaw - tailSpring) * 16 * dt;
+    tailVel *= Math.pow(0.86, dt * 60);
     tailSpring += tailVel * dt;
+    tailPitchVel += (wantPitch - tailPitch) * 11 * dt;
+    tailPitchVel *= Math.pow(0.84, dt * 60);
+    tailPitch += tailPitchVel * dt;
+  } else {
+    tailSpring = wantYaw;
+    tailPitch = wantPitch;
   }
+  if (tailSpring > 0.95) tailSpring = 0.95;
+  if (tailSpring < -0.95) tailSpring = -0.95;
 
   tailGrp.scale.setScalar(hs*0.95);
-  tailGrp.position.set(0, radius*0.62, -radius*1.05);
-  tailGrp.rotation.set(
-    Math.sin(bobT*7) * 0.08 * gait,
-    tailSpring,
-    Math.sin(bobT*7) * 0.10 * gait
-  );
+  tailGrp.position.set(0, radius*0.55, -radius*1.14);
+  tailGrp.rotation.set(tailPitch, tailSpring, wantRoll);
+
+  var hair = tailGrp.userData.hair;
+  var wantHair = -turnErr*0.85 + Math.sin(bobT*9 + 1.5)*0.42*gait;
+  if (dt > 0){
+    hairVel += (wantHair - hairLag) * 8 * dt;
+    hairVel *= Math.pow(0.80, dt * 60);
+    hairLag += hairVel * dt;
+  } else {
+    hairLag = wantHair;
+  }
+  hair.rotation.set(0.12*(1 - stream), hairLag, swish*0.08);
 }
 
 // ---------------------------------------------------------------- a horse, generally
@@ -1680,6 +1706,7 @@ function clearEnemies(){
 var radius, volume, collected, timeLeft, elapsed, running, vel, camYaw, shake, cleared;
 var hp, tier, dirty, gameMode, hitStop = 0, gulpPunch = 0;
 var camTier, camDist = 0, camHigh = 0, camKick = 0;
+var lastHands = 0, lastSizeText = "", callGen = 0;
 
 function setRadius(r){
   radius = r;
@@ -1740,6 +1767,8 @@ function reset(){
   camTier  = tier;
   camKick  = 0;
   camDist  = 0;
+  lastHands = handsOf(START_R);
+  lastSizeText = handsText(lastHands);
   vel      = new THREE.Vector3();
   camYaw   = 0;
   shake    = 0;
@@ -1747,6 +1776,10 @@ function reset(){
   bobT     = 0;
   tailSpring = 0;
   tailVel  = 0;
+  tailPitch = 0;
+  tailPitchVel = 0;
+  hairLag = 0;
+  hairVel = 0;
   nayAt    = 0;
   nayProp  = null;
   hitStop  = 0;
@@ -1858,32 +1891,49 @@ function banner(text, ms){
   clearTimeout(bannerT);
   bannerT = setTimeout(function(){ bannerEl.classList.remove("show"); }, ms || 2600);
 }
+function hushCall(){
+  callGen++;
+  if (typeof speechSynthesis === "undefined") return;
+  try { speechSynthesis.cancel(); } catch (e){}
+}
 function ownerCall(t){
   if (typeof speechSynthesis === "undefined") return;
-  try {
-    speechSynthesis.cancel();
-    var u = new SpeechSynthesisUtterance();
-    u.lang = "en-US";
-    if (t < 3){ u.text = "max."; u.rate = 0.85; u.pitch = 0.75; u.volume = 0.55; }
-    else if (t < 6){ u.text = "Max."; u.rate = 1.0; u.pitch = 0.95; u.volume = 0.8; }
-    else if (t < 9){ u.text = "Max!"; u.rate = 1.15; u.pitch = 1.15; u.volume = 1; }
-    else { u.text = "MAAAAAX"; u.rate = 0.7; u.pitch = 1.28; u.volume = 1; }
-    speechSynthesis.speak(u);
-  } catch (e){}
+  callGen++;
+  var g = callGen;
+  var u = new SpeechSynthesisUtterance();
+  u.lang = "en-US";
+  if (t < 3){ u.text = "max."; u.rate = 0.85; u.pitch = 0.75; u.volume = 0.55; }
+  else if (t < 6){ u.text = "Max."; u.rate = 1.0; u.pitch = 0.95; u.volume = 0.8; }
+  else if (t < 9){ u.text = "Max!"; u.rate = 1.15; u.pitch = 1.15; u.volume = 1; }
+  else { u.text = "MAAAAAX"; u.rate = 0.7; u.pitch = 1.28; u.volume = 1; }
+  try { speechSynthesis.cancel(); } catch (e){}
+  // chrome drops speak() in the same tick as cancel()
+  setTimeout(function(){
+    if (g !== callGen) return;
+    try { speechSynthesis.speak(u); } catch (e){}
+  }, 50);
 }
 function checkTier(){
   var h = handsOf(radius);
   var t = tierIndex(h);
+  var label = handsText(h);
+  var grew = h > lastHands + 1e-9 && label !== lastSizeText;
+  lastHands = h;
+  lastSizeText = label;
   if (t > camTier){
     camTier = t;
     camKick = 1;
   }
-  if (t <= tier) { tier = t; return; }
-  tier = t;
-  ownerCall(t);
-  if (cleared) return;                  // goal banner owns the screen up there
-  var row = TIERS[t];
-  banner(row[2] || (handsText(row[0]) + "hh — " + row[1]), row[2] ? 3600 : 2200);
+  if (t > tier){
+    tier = t;
+    if (!cleared){
+      var row = TIERS[t];
+      banner(row[2] || (handsText(row[0]) + "hh — " + row[1]), row[2] ? 3600 : 2200);
+    }
+  } else {
+    tier = t;
+  }
+  if (grew && running) ownerCall(t);
 }
 
 // ---------------------------------------------------------------- nay
@@ -2152,8 +2202,8 @@ function step(dt){
   if (moveDir.lengthSq() > 1) moveDir.normalize();
 
   var pm      = powerMul();
-  var accel   = (16 + radius*7)   * pm;
-  var maxSpd  = (7  + radius*2.6) * pm;
+  var accel   = (18 + radius*7)   * pm;
+  var maxSpd  = (8.2 + radius*2.6) * pm;
   vel.addScaledVector(moveDir, accel*dt);
   vel.multiplyScalar(Math.pow(0.02, dt));
   var sp = vel.length();
@@ -2406,7 +2456,7 @@ function submitKing(won){
 
 function begin(mode){
   ensureAudio();
-  if (typeof speechSynthesis !== "undefined") try { speechSynthesis.cancel(); } catch (e){}
+  hushCall();
   gameMode = mode === "endless" ? "endless" : "timed";
   saveMode(gameMode);
   startveil.classList.add("hidden");
@@ -2446,6 +2496,26 @@ setInterval(function(){
     glossEl.style.opacity = 1;
   }, 340);
 }, 3200);
+
+var voiceUnlocked = false;
+function titleCall(){
+  if (!voiceUnlocked) return;
+  if (running || startveil.classList.contains("hidden")) return;
+  ownerCall(99);
+}
+setInterval(titleCall, 9000);
+function unlockVoice(){
+  voiceUnlocked = true;
+  if (typeof speechSynthesis !== "undefined") try { speechSynthesis.getVoices(); } catch (e){}
+  titleCall();
+}
+addEventListener("pointerdown", unlockVoice, {once:true});
+addEventListener("keydown", unlockVoice, {once:true});
+if (typeof speechSynthesis !== "undefined"){
+  setInterval(function(){
+    if (speechSynthesis.speaking) try { speechSynthesis.resume(); } catch (e){}
+  }, 8000);
+}
 
 var seedstart = document.getElementById("seedstart");
 if (DEV){

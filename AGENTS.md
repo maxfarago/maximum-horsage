@@ -102,7 +102,7 @@ Star 2 is "they come after you". Do not put chase back in the 3-minute game. Do 
 
 Framing does not ease with radius. `camTier` tracks peak `TIERS` row. `dist` / `high` / `fov` snap to the *next* tier's radius (`framedRadius`) and kick 20% on level-up, then settle. Shedding does not zoom back in. Do not add a second follow mode. Do not scale FOV from hp.
 
-`TIERS` also drive HUD names, banners, and `ownerCall` (speechSynthesis "max" → "MAAAAAX").
+`TIERS` drive HUD names and banners. `ownerCall` (speechSynthesis "max" → "MAAAAAX") fires on every displayed hh tick, not only named tiers, and the title card yells in the background. Chrome needs a tick after `cancel()` before `speak()`.
 
 ## King
 
