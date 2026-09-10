@@ -1,11 +1,17 @@
 # umatamari
 
-ウマたまり. Katamari, but Max is a horse. Everything smaller sticks. Everything bigger says nay. Daily field, three minutes, 78.2hh.
+ウマたまり. katamari, but max is a horse. everything smaller than him sticks. everything bigger says nay.
 
-Play: [umatamari.max.horse](https://umatamari.max.horse)
+play it at [max.horse](https://max.horse).
+
+the field is the same for everyone each utc day. grow to 78.2hh. you have three minutes, or you can play endless and stop when you like. the umatamari is the largest timed roll. there can be only one.
 
 ```
 npm i && npm run dev
 ```
 
-Cloudflare Pages project is still `maximum-horsage`. The Muybridge runner lives on the `gait` branch.
+`?seed=dev` is the dev field. that run does not count.
+
+deploy with `npm run deploy`. cloudflare pages knows the project as `maximum-horsage`.
+
+the muybridge runner is on the `gait` branch.
