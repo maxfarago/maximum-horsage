@@ -22,6 +22,8 @@ var UP          = new THREE.Vector3(0,1,0);
 var DEBRIS_CAP  = 24;
 var TRACER_CAP  = 40;
 var HIT_INVULN  = 0.55;
+var GULP        = 0.10;
+var HIT_STOP    = 3;
 
 // ---------------------------------------------------------------- rng
 function fnv1a(s){
@@ -48,6 +50,64 @@ var DEV  = SEED === "dev";
 var rnd  = mulberry32(fnv1a(SEED));
 function reseed(){ rnd = mulberry32(fnv1a(SEED)); }
 var trnd = mulberry32(0xC0FFEE);
+
+var actx = null;
+function ensureAudio(){
+  var AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return;
+  if (!actx) actx = new AC();
+  if (actx.state === "suspended") actx.resume();
+}
+function tone(freq, dur, type, vol, dest, delay){
+  if (!actx) return;
+  var t = actx.currentTime + (delay || 0);
+  var o = actx.createOscillator();
+  var g = actx.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(freq, t);
+  if (dest) o.frequency.exponentialRampToValueAtTime(Math.max(1, dest), t + dur);
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(t); o.stop(t + dur + 0.01);
+}
+function noise(dur, vol, freq){
+  if (!actx) return;
+  var n = Math.max(1, (actx.sampleRate * dur) | 0);
+  var buf = actx.createBuffer(1, n, actx.sampleRate);
+  var data = buf.getChannelData(0), i;
+  for (i=0;i<n;i++) data[i] = Math.random()*2-1;
+  var src = actx.createBufferSource();
+  src.buffer = buf;
+  var f = actx.createBiquadFilter();
+  f.type = "bandpass";
+  f.frequency.value = freq;
+  f.Q.value = 0.8;
+  var g = actx.createGain();
+  var t = actx.currentTime;
+  g.gain.setValueAtTime(vol, t);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  src.connect(f); f.connect(g); g.connect(actx.destination);
+  src.start(t);
+}
+function sfxStick(){
+  var f = 260 * Math.pow(radius / START_R, 0.32);
+  if (f > 920) f = 920;
+  tone(f, 0.048, "square", 0.07, f * 1.28);
+  tone(f * 2, 0.03, "square", 0.028);
+}
+function sfxNay(){
+  tone(98, 0.16, "triangle", 0.18, 52);
+  noise(0.09, 0.12, 180);
+}
+function sfxShed(){
+  noise(0.07, 0.1, 420);
+  tone(190, 0.06, "square", 0.04, 90);
+}
+function sfxWanted(){
+  tone(392, 0.1, "square", 0.09);
+  tone(466, 0.14, "square", 0.09, 330, 0.09);
+}
 
 function loadMode(){
   try { return sessionStorage.getItem(MODE_KEY) || "timed"; } catch(e){ return "timed"; }
@@ -199,9 +259,12 @@ scene.add(sky);
 var skyRoot = new THREE.Group();
 scene.add(skyRoot);
 
-var sunMat = new THREE.MeshBasicMaterial({ color: 0xffe082, fog: false, depthWrite: false });
+var sunMat = new THREE.MeshBasicMaterial({
+  color: 0xffe082, fog: false, depthTest: false, depthWrite: false
+});
 var sunDisc = new THREE.Mesh(new THREE.SphereGeometry(36, 16, 12), sunMat);
 sunDisc.position.copy(SUN_VIEW).multiplyScalar(260);
+sunDisc.frustumCulled = false;
 sunDisc.renderOrder = -1;
 skyRoot.add(sunDisc);
 
@@ -210,40 +273,48 @@ var sunGlow = new THREE.Mesh(
   new THREE.MeshBasicMaterial({
     color: 0xffe08a,
     fog: false,
+    depthTest: false,
     depthWrite: false,
     transparent: true,
     opacity: 0.28
   })
 );
 sunGlow.position.copy(SUN_VIEW).multiplyScalar(260);
+sunGlow.frustumCulled = false;
 sunGlow.renderOrder = -1;
 skyRoot.add(sunGlow);
 
-var cloudMat = new THREE.MeshBasicMaterial({ color: 0xd8e4f0, fog: false, depthWrite: false });
+var cloudMat = new THREE.MeshBasicMaterial({
+  color: 0xd8e4f0, fog: false, depthTest: false, depthWrite: false
+});
+var cloudShade = new THREE.MeshBasicMaterial({
+  color: 0xc5d3e4, fog: false, depthTest: false, depthWrite: false
+});
 function addCloud(az, el, scale){
   var g = new THREE.Group();
   function slab(w, h, d, x, y, z, mat){
     var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat || cloudMat);
     m.position.set(x, y, z);
+    m.frustumCulled = false;
     g.add(m);
   }
-  var shade = new THREE.MeshBasicMaterial({ color: 0xc5d3e4, fog: false, depthWrite: false });
   slab(1.8, 0.7, 1.1, 0, 0, 0);
   slab(1.2, 0.55, 0.9, 0.85, 0.12, 0.15);
   slab(1.0, 0.5, 0.8, -0.75, 0.08, -0.1);
-  slab(0.8, 0.42, 0.7, 0.2, 0.28, -0.05, shade);
-  var dist = 160;
+  slab(0.8, 0.42, 0.7, 0.2, 0.28, -0.05, cloudShade);
+  var dist = 220;
   var ce = Math.cos(el), se = Math.sin(el);
   g.position.set(Math.sin(az)*ce*dist, se*dist, -Math.cos(az)*ce*dist);
   g.scale.setScalar(scale);
+  g.frustumCulled = false;
   skyRoot.add(g);
 }
-addCloud(-0.22, 0.22, 48);
-addCloud(0.38, 0.26, 40);
-addCloud(-0.55, 0.18, 52);
-addCloud(0.7, 0.24, 44);
-addCloud(0.05, 0.32, 34);
-addCloud(-0.95, 0.2, 42);
+addCloud(-0.22, 0.14, 12);
+addCloud(0.38, 0.16, 10);
+addCloud(-0.55, 0.12, 13);
+addCloud(0.7, 0.15, 11);
+addCloud(0.05, 0.18, 8);
+addCloud(-0.95, 0.13, 11);
 
 // ---------------------------------------------------------------- the ball
 function ballTexture(){
@@ -1152,6 +1223,7 @@ function shed(count, awayDir){
     imp.y += 2.8 + radius * 0.8;
     spawnDebris(mesh, imp);
   }
+  if (n) sfxShed();
   checkTier();
   syncHUD();
 }
@@ -1278,6 +1350,7 @@ function maintainEnemies(){
   if (next > wantedStars){
     wantedStars = next;
     updateWantedHUD();
+    sfxWanted();
     if (wantedStars === 1) banner("One star. Stay small next time.", 2600);
     else if (wantedStars === 2) banner("Two stars. They're tracking you.", 2600);
     else if (wantedStars === 3) banner("Three stars. They brought a tank.", 2800);
@@ -1445,6 +1518,8 @@ function collectEnemy(e, u){
   volume += u.size * u.size * u.size * FILL * 0.5;
   setRadius(Math.cbrt(volume * 3 / (4 * Math.PI)));
   collected++;
+  gulpPunch = Math.min(0.11, gulpPunch + 0.04);
+  sfxStick();
   announce(u.kind, 0);
   checkTier();
   syncHUD();
@@ -1468,7 +1543,7 @@ function clearEnemies(){
 
 // ---------------------------------------------------------------- state
 var radius, volume, collected, timeLeft, elapsed, running, vel, camYaw, shake, cleared;
-var hp, tier, dirty, gameMode;
+var hp, tier, dirty, gameMode, hitStop = 0, gulpPunch = 0;
 
 function setRadius(r){
   radius = r;
@@ -1521,6 +1596,8 @@ function reset(){
   tailVel  = 0;
   nayAt    = 0;
   nayProp  = null;
+  hitStop  = 0;
+  gulpPunch = 0;
 
   katamari.position.set(0, radius, 0);
   katamari.quaternion.identity();
@@ -1545,13 +1622,15 @@ function reset(){
 // ---------------------------------------------------------------- collecting
 function collect(p){
   var s = p.userData.size;
+  var from, i, a;
   p.matrixAutoUpdate = true;
 
   katamari.getWorldQuaternion(tmpQ).invert();
   tmpV.copy(p.position).sub(katamari.position).applyQuaternion(tmpQ);
   if (tmpV.lengthSq() < 1e-6) tmpV.set(0, 1, 0);
-  tmpV.normalize().multiplyScalar(radius*0.96 + s*0.34);
-  p.position.copy(tmpV);
+  from = tmpV.clone();
+
+  p.position.copy(from);
   p.quaternion.premultiply(tmpQ);
 
   scene.remove(p);
@@ -1562,10 +1641,17 @@ function collect(p){
   setRadius(Math.cbrt(volume*3/(4*Math.PI)));
   collected++;
 
+  p.userData.gulpFrom = from;
+  p.userData.gulpTo = from.clone().normalize().multiplyScalar(radius*0.96 + s*0.34);
+  p.userData.gulpT = 0;
+  gulpPunch = Math.min(0.11, gulpPunch + 0.04);
+  sfxStick();
+
   if (p.userData.hp){ hp += p.userData.hp; applyFov(); }
 
-  for (var i=attached.length-1;i>=0;i--){
-    var a = attached[i];
+  for (i=attached.length-1;i>=0;i--){
+    a = attached[i];
+    if (a.userData.gulpTo) continue;
     if (a.position.length() + a.userData.size*0.55 < radius*0.94){
       dumpBaked(a);
       katamari.remove(a);
@@ -1575,6 +1661,24 @@ function collect(p){
   announce(p.userData.name, p.userData.hp);
   checkTier();
   syncHUD();
+}
+
+function updateGulps(dt){
+  var i, a, t, k;
+  for (i=0;i<attached.length;i++){
+    a = attached[i];
+    if (!a.userData.gulpTo) continue;
+    t = a.userData.gulpT + dt / GULP;
+    if (t >= 1){
+      a.position.copy(a.userData.gulpTo);
+      a.userData.gulpFrom = a.userData.gulpTo = null;
+      a.userData.gulpT = 0;
+      continue;
+    }
+    a.userData.gulpT = t;
+    k = 1 - (1-t)*(1-t)*(1-t);
+    a.position.lerpVectors(a.userData.gulpFrom, a.userData.gulpTo, k);
+  }
 }
 
 var pickedEl = document.getElementById("picked");
@@ -1636,6 +1740,8 @@ function nay(p){
   nayEl.classList.remove("go");
   void nayEl.offsetWidth;
   nayEl.classList.add("go");
+  hitStop = HIT_STOP;
+  sfxNay();
 }
 
 // ---------------------------------------------------------------- HUD
@@ -1847,6 +1953,11 @@ var fwd = new THREE.Vector3();
 var right = new THREE.Vector3();
 
 function step(dt){
+  if (hitStop > 0){
+    hitStop--;
+    stashPrev();
+    return;
+  }
   stashPrev();
   var fx = 0, fz = 0;
   if (keys.KeyW || keys.ArrowUp)    fz += 1;
@@ -1921,6 +2032,7 @@ function step(dt){
     }
   }
   if (shake > 0) shake = Math.max(0, shake - dt*1.4);
+  updateGulps(dt);
 }
 
 function followSun(){
@@ -1939,6 +2051,7 @@ var fpsT = 0, fpsN = 0, fps = 0;
 function frame(){
   requestAnimationFrame(frame);
   var dt = Math.min(clock.getDelta(), 0.25);
+  if (gulpPunch > 0) gulpPunch = Math.max(0, gulpPunch - dt * 0.85);
   fpsN++;
   fpsT += dt;
   if (fpsT >= 0.5){
@@ -1951,12 +2064,15 @@ function frame(){
     acc += dt;
     var n = 0;
     while (acc >= FIXED && n < MAX_STEPS && running){
+      var frozen = hitStop > 0;
       step(FIXED);
-      if (gameMode === "endless") elapsed += FIXED;
-      else timeLeft -= FIXED;
+      if (!frozen){
+        if (gameMode === "endless") elapsed += FIXED;
+        else timeLeft -= FIXED;
+      }
       acc -= FIXED;
       n++;
-      if (gameMode !== "endless" && timeLeft <= 0) break;
+      if (!frozen && gameMode !== "endless" && timeLeft <= 0) break;
     }
     if (acc > FIXED*MAX_STEPS) acc = 0;
     syncClock();
@@ -1967,11 +2083,16 @@ function frame(){
 
   var alpha = running ? Math.max(0, Math.min(1, acc / FIXED)) : 1;
   pushInterp(alpha);
+  if (gulpPunch > 0){
+    katamari.scale.setScalar(1 + gulpPunch);
+    katamari.position.y += radius * gulpPunch;
+  }
   followSun();
   updateRig(dt);
   placeCamera(dt, false);
   placeSky();
   renderer.render(scene, camera);
+  katamari.scale.setScalar(1);
   popInterp();
 }
 
@@ -1992,6 +2113,11 @@ window.__mh = function(){
     props: props.length,
     mode: gameMode,
     elapsed: +elapsed.toFixed(2),
+    collected: collected,
+    radius: +radius.toFixed(3),
+    gulpPunch: +gulpPunch.toFixed(3),
+    hitStop: hitStop,
+    gulping: attached.filter(function(a){ return a.userData.gulpTo; }).length,
     cx: +camera.position.x.toFixed(5),
     cz: +camera.position.z.toFixed(5),
     mix: (function(){
@@ -2095,6 +2221,7 @@ function submitKing(won){
 }
 
 function begin(mode){
+  ensureAudio();
   if (typeof speechSynthesis !== "undefined") try { speechSynthesis.cancel(); } catch (e){}
   gameMode = mode === "endless" ? "endless" : "timed";
   saveMode(gameMode);
