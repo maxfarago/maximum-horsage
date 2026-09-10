@@ -99,12 +99,17 @@
   .card{max-width:460px;width:100%;text-align:center;background:var(--cream);
     border:4px solid var(--ink);border-radius:26px;box-shadow:0 8px 0 var(--ink);padding:30px 28px 24px}
   .card h1{font-size:56px;font-weight:700;line-height:.92;letter-spacing:-.03em}
-  .card h1.brand{letter-spacing:0;line-height:.82;margin:0 0 4px}
-  .card h1.brand .word{display:flex;justify-content:space-between}
-  .card h1.brand .word i{font-style:normal}
+  .card h1.brand{
+    display:inline-flex;flex-direction:column;align-items:stretch;
+    letter-spacing:0;line-height:1;margin:0 0 4px
+  }
+  .card h1.brand .word{display:flex;gap:.08em;width:max-content}
+  .card h1.brand .word i,
+  .card h1.brand .jp i{font-style:normal}
   .card h1.brand .jp{
-    display:block;font-style:normal;font-size:22px;font-weight:700;
-    letter-spacing:.22em;margin:10px 0 0;opacity:.72;
+    display:flex;justify-content:space-between;width:0;min-width:100%;
+    font-size:1em;font-weight:700;letter-spacing:0;margin:8px 0 0;
+    color:rgba(43,33,64,.38);
     font-family:"Hiragino Maru Gothic ProN","Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif
   }
   .card p{font-size:15px;font-weight:400;line-height:1.55;margin-top:14px;opacity:.85}
@@ -150,7 +155,7 @@
   @media (hover:hover){#stick,#look,#knob{display:none!important}}
   @media (max-width:560px){
     #sizeval{font-size:27px}.card h1{font-size:42px}.card h1.brand{font-size:34px}
-    .card h1.brand .jp{font-size:16px;letter-spacing:.16em}#hint{display:none}
+    #hint{display:none}
     #nay{font-size:42px}#banner{font-size:16px}
   }
   @media (prefers-reduced-motion:reduce){

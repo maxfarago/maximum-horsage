@@ -1680,6 +1680,7 @@ function clearEnemies(){
 var radius, volume, collected, timeLeft, elapsed, running, vel, camYaw, shake, cleared;
 var hp, tier, dirty, gameMode, hitStop = 0, gulpPunch = 0;
 var camTier, camDist = 0, camHigh = 0, camKick = 0;
+var lastHands = 0, lastSizeText = "", callGen = 0;
 
 function setRadius(r){
   radius = r;
@@ -1740,6 +1741,8 @@ function reset(){
   camTier  = tier;
   camKick  = 0;
   camDist  = 0;
+  lastHands = handsOf(START_R);
+  lastSizeText = handsText(lastHands);
   vel      = new THREE.Vector3();
   camYaw   = 0;
   shake    = 0;
@@ -1858,32 +1861,49 @@ function banner(text, ms){
   clearTimeout(bannerT);
   bannerT = setTimeout(function(){ bannerEl.classList.remove("show"); }, ms || 2600);
 }
+function hushCall(){
+  callGen++;
+  if (typeof speechSynthesis === "undefined") return;
+  try { speechSynthesis.cancel(); } catch (e){}
+}
 function ownerCall(t){
   if (typeof speechSynthesis === "undefined") return;
-  try {
-    speechSynthesis.cancel();
-    var u = new SpeechSynthesisUtterance();
-    u.lang = "en-US";
-    if (t < 3){ u.text = "max."; u.rate = 0.85; u.pitch = 0.75; u.volume = 0.55; }
-    else if (t < 6){ u.text = "Max."; u.rate = 1.0; u.pitch = 0.95; u.volume = 0.8; }
-    else if (t < 9){ u.text = "Max!"; u.rate = 1.15; u.pitch = 1.15; u.volume = 1; }
-    else { u.text = "MAAAAAX"; u.rate = 0.7; u.pitch = 1.28; u.volume = 1; }
-    speechSynthesis.speak(u);
-  } catch (e){}
+  callGen++;
+  var g = callGen;
+  var u = new SpeechSynthesisUtterance();
+  u.lang = "en-US";
+  if (t < 3){ u.text = "max."; u.rate = 0.85; u.pitch = 0.75; u.volume = 0.55; }
+  else if (t < 6){ u.text = "Max."; u.rate = 1.0; u.pitch = 0.95; u.volume = 0.8; }
+  else if (t < 9){ u.text = "Max!"; u.rate = 1.15; u.pitch = 1.15; u.volume = 1; }
+  else { u.text = "MAAAAAX"; u.rate = 0.7; u.pitch = 1.28; u.volume = 1; }
+  try { speechSynthesis.cancel(); } catch (e){}
+  // chrome drops speak() in the same tick as cancel()
+  setTimeout(function(){
+    if (g !== callGen) return;
+    try { speechSynthesis.speak(u); } catch (e){}
+  }, 50);
 }
 function checkTier(){
   var h = handsOf(radius);
   var t = tierIndex(h);
+  var label = handsText(h);
+  var grew = h > lastHands + 1e-9 && label !== lastSizeText;
+  lastHands = h;
+  lastSizeText = label;
   if (t > camTier){
     camTier = t;
     camKick = 1;
   }
-  if (t <= tier) { tier = t; return; }
-  tier = t;
-  ownerCall(t);
-  if (cleared) return;                  // goal banner owns the screen up there
-  var row = TIERS[t];
-  banner(row[2] || (handsText(row[0]) + "hh — " + row[1]), row[2] ? 3600 : 2200);
+  if (t > tier){
+    tier = t;
+    if (!cleared){
+      var row = TIERS[t];
+      banner(row[2] || (handsText(row[0]) + "hh — " + row[1]), row[2] ? 3600 : 2200);
+    }
+  } else {
+    tier = t;
+  }
+  if (grew && running) ownerCall(t);
 }
 
 // ---------------------------------------------------------------- nay
@@ -2406,7 +2426,7 @@ function submitKing(won){
 
 function begin(mode){
   ensureAudio();
-  if (typeof speechSynthesis !== "undefined") try { speechSynthesis.cancel(); } catch (e){}
+  hushCall();
   gameMode = mode === "endless" ? "endless" : "timed";
   saveMode(gameMode);
   startveil.classList.add("hidden");
@@ -2446,6 +2466,26 @@ setInterval(function(){
     glossEl.style.opacity = 1;
   }, 340);
 }, 3200);
+
+var voiceUnlocked = false;
+function titleCall(){
+  if (!voiceUnlocked) return;
+  if (running || startveil.classList.contains("hidden")) return;
+  ownerCall(99);
+}
+setInterval(titleCall, 9000);
+function unlockVoice(){
+  voiceUnlocked = true;
+  if (typeof speechSynthesis !== "undefined") try { speechSynthesis.getVoices(); } catch (e){}
+  titleCall();
+}
+addEventListener("pointerdown", unlockVoice, {once:true});
+addEventListener("keydown", unlockVoice, {once:true});
+if (typeof speechSynthesis !== "undefined"){
+  setInterval(function(){
+    if (speechSynthesis.speaking) try { speechSynthesis.resume(); } catch (e){}
+  }, 8000);
+}
 
 var seedstart = document.getElementById("seedstart");
 if (DEV){
