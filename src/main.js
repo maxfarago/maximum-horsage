@@ -15,7 +15,7 @@ var MAX_STEPS   = 6;
 var HEAD_K      = 0.85;
 var HEAD_POW    = 0.65;
 var CM_PER_HAND = 10.16;    // four inches, exactly
-var MODE_KEY    = "maxhorse-mode";
+var MODE_KEY    = "umatamari-mode";
 var HINT_TIMED  = "Small stuff sticks. Big stuff says nay. Grow quiet — the army only notices when you get big.";
 var HINT_ENDLESS= "No bell. Esc or tap the clock when you're done.";
 var UP          = new THREE.Vector3(0,1,0);
@@ -2152,7 +2152,7 @@ function finish(won){
   running = false;
   var h = handsOf(radius);
   var endless = gameMode === "endless";
-  document.getElementById("endtitle").textContent = won ? "MAX HORSE" : (endless ? "enough." : "time.");
+  document.getElementById("endtitle").textContent = won ? "umatamari" : (endless ? "enough." : "time.");
   document.getElementById("final").innerHTML = handsText(h) + "<span>hh</span>";
   document.getElementById("tally").textContent =
     collected + " things stuck to Max · " + metricText(radius) + " across";
@@ -2172,8 +2172,8 @@ function finish(won){
 }
 
 function kingLine(k){
-  if (!k || !k.hh) return "no max horse yet. there can be only one.";
-  return "the max horse is <b>" + handsText(k.hh) + "hh</b>";
+  if (!k || !k.hh) return "no umatamari yet. there can be only one.";
+  return "the umatamari is <b>" + handsText(k.hh) + "hh</b>";
 }
 function showKing(k){
   var start = document.getElementById("kingline");
@@ -2213,9 +2213,9 @@ function submitKing(won){
     if (!d) return;
     if (d.king) showKing(d.king);
     if (d.took){
-      document.getElementById("endtitle").textContent = "THE MAX HORSE";
+      document.getElementById("endtitle").textContent = "THE UMATAMARI";
       var note = document.getElementById("endnote");
-      note.textContent = (won ? note.textContent + " " : "") + "this is the max horse.";
+      note.textContent = (won ? note.textContent + " " : "") + "this is the umatamari.";
     }
   }).catch(function(){});
 }
@@ -2248,9 +2248,9 @@ addEventListener("resize", function(){
 
 // ---------------------------------------------------------------- title card
 var GLOSS = [
-  "<b>max</b> <i>proper noun</i><br>a horse.",
-  "<b>max</b> <i>verb</i><br>to enlarge, past all reason.",
-  "<b>max.horse</b> <i>property</i><br>the number that comes back. it only goes up."
+  "<b>uma</b> <i>noun</i><br>a horse.",
+  "<b>tamari</b> <i>noun</i><br>a lump. everything that stuck.",
+  "<b>umatamari</b> <i>property</i><br>the number that comes back. it only goes up."
 ];
 var glossEl = document.getElementById("gloss"), gi = 1;
 glossEl.innerHTML = GLOSS[0];
