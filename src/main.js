@@ -443,8 +443,13 @@ function buildHead(){
 }
 function buildTail(){
   var g = new THREE.Group();
-  g.add(box(MANE, 0.16,0.16,0.18, 0, 0.10, 0.02));
-  turn(g, con(MANE, 0.15, 0.62, 0, -0.10, -0.20), 2.25, 0, 0);
+  g.add(box(MANE, 0.16,0.16,0.18, 0, 0.06, 0.04));
+  var hair = new THREE.Group();
+  hair.position.set(0, 0.02, -0.04);
+  turn(hair, con(MANE, 0.16, 0.46, 0, -0.02, -0.16), 1.95, 0, 0);
+  turn(hair, con(MANE, 0.10, 0.42, 0, -0.12, -0.50), 2.18, 0, 0);
+  g.add(hair);
+  g.userData.hair = hair;
   return g;
 }
 
@@ -453,6 +458,7 @@ var headGrp = buildHead(); rig.add(headGrp);
 var tailGrp = buildTail(); rig.add(tailGrp);
 
 var rigYaw = 0, bobT = 0, tailSpring = 0, tailVel = 0;
+var tailPitch = 0, tailPitchVel = 0, hairLag = 0, hairVel = 0;
 function angLerp(a,b,t){
   var d = ((b - a + Math.PI*3) % (Math.PI*2)) - Math.PI;
   return a + d*t;
@@ -469,25 +475,45 @@ function updateRig(dt){
 
   var gait = Math.min(1, sp / 5);
   var bob  = Math.sin(bobT*9) * 0.06 * gait;
+  var stream = Math.min(1, sp / 7.5);
+  var turnErr = sp > 0.35 ? ((rigYaw - targetYaw + Math.PI*3) % (Math.PI*2)) - Math.PI : 0;
+  var swish = Math.sin(bobT*9 + 0.7) * gait;
 
   headGrp.scale.setScalar(hs);
   headGrp.position.set(0, radius*0.30 + bob*radius*0.2, radius*1.05);
   headGrp.rotation.set(bob, 0, 0);
 
+  var wantPitch = 0.16*(1 - stream) - 0.22*stream + bob*0.28;
+  var wantYaw   = -turnErr*1.55 + swish*0.34;
+  var wantRoll  = swish*0.12;
   if (dt > 0){
-    var targetTail = -sp * 0.22 - (rigYaw - targetYaw) * 1.2;
-    tailVel += (targetTail - tailSpring) * 14 * dt;
-    tailVel *= Math.pow(0.84, dt * 60);
+    tailVel += (wantYaw - tailSpring) * 16 * dt;
+    tailVel *= Math.pow(0.86, dt * 60);
     tailSpring += tailVel * dt;
+    tailPitchVel += (wantPitch - tailPitch) * 11 * dt;
+    tailPitchVel *= Math.pow(0.84, dt * 60);
+    tailPitch += tailPitchVel * dt;
+  } else {
+    tailSpring = wantYaw;
+    tailPitch = wantPitch;
   }
+  if (tailSpring > 0.95) tailSpring = 0.95;
+  if (tailSpring < -0.95) tailSpring = -0.95;
 
   tailGrp.scale.setScalar(hs*0.95);
-  tailGrp.position.set(0, radius*0.62, -radius*1.05);
-  tailGrp.rotation.set(
-    Math.sin(bobT*7) * 0.08 * gait,
-    tailSpring,
-    Math.sin(bobT*7) * 0.10 * gait
-  );
+  tailGrp.position.set(0, radius*0.55, -radius*1.14);
+  tailGrp.rotation.set(tailPitch, tailSpring, wantRoll);
+
+  var hair = tailGrp.userData.hair;
+  var wantHair = -turnErr*0.85 + Math.sin(bobT*9 + 1.5)*0.42*gait;
+  if (dt > 0){
+    hairVel += (wantHair - hairLag) * 8 * dt;
+    hairVel *= Math.pow(0.80, dt * 60);
+    hairLag += hairVel * dt;
+  } else {
+    hairLag = wantHair;
+  }
+  hair.rotation.set(0.12*(1 - stream), hairLag, swish*0.08);
 }
 
 // ---------------------------------------------------------------- a horse, generally
@@ -1750,6 +1776,10 @@ function reset(){
   bobT     = 0;
   tailSpring = 0;
   tailVel  = 0;
+  tailPitch = 0;
+  tailPitchVel = 0;
+  hairLag = 0;
+  hairVel = 0;
   nayAt    = 0;
   nayProp  = null;
   hitStop  = 0;
@@ -2172,8 +2202,8 @@ function step(dt){
   if (moveDir.lengthSq() > 1) moveDir.normalize();
 
   var pm      = powerMul();
-  var accel   = (16 + radius*7)   * pm;
-  var maxSpd  = (7  + radius*2.6) * pm;
+  var accel   = (18 + radius*7)   * pm;
+  var maxSpd  = (8.2 + radius*2.6) * pm;
   vel.addScaledVector(moveDir, accel*dt);
   vel.multiplyScalar(Math.pow(0.02, dt));
   var sp = vel.length();
