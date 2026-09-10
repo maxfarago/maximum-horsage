@@ -69,9 +69,12 @@ renderer.shadowMap.type = THREE.BasicShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 document.body.appendChild(renderer.domElement);
 
+var SKY_HORIZON = 0xc8eef8;
+var SUN_DIR     = new THREE.Vector3(22, 55, -30).normalize();
+
 var scene = new THREE.Scene();
-scene.background = new THREE.Color(0x7fd4f5);
-scene.fog = new THREE.Fog(0x7fd4f5, 60, 230);
+scene.background = new THREE.Color(SKY_HORIZON);
+scene.fog = new THREE.Fog(SKY_HORIZON, 60, 230);
 
 var camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.1, 700);
 
@@ -88,18 +91,47 @@ scene.add(sun.target);
 
 // ---------------------------------------------------------------- ground
 function groundTexture(){
-  var c = document.createElement("canvas"); c.width = c.height = 256;
+  var s = 1024, i, x, y, rx, ry, rot, ox, oz;
+  var c = document.createElement("canvas"); c.width = c.height = s;
   var g = c.getContext("2d");
-  g.fillStyle = "#78c455"; g.fillRect(0,0,256,256);
-  g.fillStyle = "#6cb84c"; g.fillRect(0,0,128,128); g.fillRect(128,128,128,128);
-  for (var i=0;i<900;i++){
-    g.fillStyle = trnd()<0.5 ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.05)";
-    g.fillRect(trnd()*256, trnd()*256, 3, 3);
+  g.fillStyle = "#78c455"; g.fillRect(0,0,s,s);
+  function blob(color, n, r0, r1){
+    g.fillStyle = color;
+    for (i=0;i<n;i++){
+      x = trnd()*s; y = trnd()*s;
+      rx = r0 + trnd()*(r1-r0);
+      ry = rx * (0.55 + trnd()*0.7);
+      rot = trnd()*6.283;
+      for (ox=-1;ox<=1;ox++) for (oz=-1;oz<=1;oz++){
+        g.beginPath();
+        g.ellipse(x+ox*s, y+oz*s, rx, ry, rot, 0, 6.283);
+        g.fill();
+      }
+    }
+  }
+  g.globalAlpha = 0.32;
+  blob("#6cb84c", 70, 16, 48);
+  blob("#86cc5f", 55, 12, 40);
+  g.globalAlpha = 0.22;
+  blob("#5ea844", 36, 10, 32);
+  g.globalAlpha = 0.28;
+  blob("#9a8b48", 9, 6, 18);
+  g.globalAlpha = 1;
+  for (i=0;i<14000;i++){
+    g.fillStyle = trnd()<0.5 ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.045)";
+    g.fillRect(trnd()*s, trnd()*s, 1+trnd()*2, 1+trnd()*2);
+  }
+  for (i=0;i<220;i++){
+    g.fillStyle = trnd()<0.55 ? "rgba(255,246,224,.45)" : "rgba(255,210,63,.35)";
+    g.beginPath();
+    g.arc(trnd()*s, trnd()*s, 1+trnd()*1.2, 0, 6.283);
+    g.fill();
   }
   var t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(230,230);
+  t.repeat.set(72, 72);
   t.encoding = THREE.sRGBEncoding;
+  t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
   return t;
 }
 var ground = new THREE.Mesh(
@@ -109,6 +141,42 @@ var ground = new THREE.Mesh(
 ground.rotation.x = -Math.PI/2;
 ground.receiveShadow = true;
 scene.add(ground);
+
+function skyTexture(){
+  var c = document.createElement("canvas"); c.width = 8; c.height = 256;
+  var g = c.getContext("2d");
+  var grd = g.createLinearGradient(0, 0, 0, 256);
+  grd.addColorStop(0, "#2f8fc8");
+  grd.addColorStop(0.38, "#6ec4ea");
+  grd.addColorStop(0.50, "#c8eef8");
+  grd.addColorStop(0.58, "#c8eef8");
+  grd.addColorStop(1, "#74c052");
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 8, 256);
+  var t = new THREE.CanvasTexture(c);
+  t.encoding = THREE.sRGBEncoding;
+  t.magFilter = THREE.LinearFilter;
+  t.minFilter = THREE.LinearFilter;
+  return t;
+}
+var sky = new THREE.Mesh(
+  new THREE.SphereGeometry(420, 24, 16),
+  new THREE.MeshBasicMaterial({
+    map: skyTexture(),
+    side: THREE.BackSide,
+    depthWrite: false,
+    fog: false
+  })
+);
+sky.renderOrder = -1;
+scene.add(sky);
+
+var sunDisc = new THREE.Mesh(
+  new THREE.SphereGeometry(14, 12, 10),
+  new THREE.MeshBasicMaterial({ color: 0xfff3d0, fog: false, depthWrite: false })
+);
+sunDisc.renderOrder = -1;
+scene.add(sunDisc);
 
 // ---------------------------------------------------------------- the ball
 function ballTexture(){
@@ -246,7 +314,7 @@ var rig     = new THREE.Group(); scene.add(rig);
 var headGrp = buildHead(); rig.add(headGrp);
 var tailGrp = buildTail(); rig.add(tailGrp);
 
-var rigYaw = 0, bobT = 0;
+var rigYaw = 0, bobT = 0, tailSpring = 0, tailVel = 0;
 function angLerp(a,b,t){
   var d = ((b - a + Math.PI*3) % (Math.PI*2)) - Math.PI;
   return a + d*t;
@@ -255,9 +323,10 @@ function updateRig(dt){
   bobT += dt;
   var hs = HEAD_K * Math.pow(radius, HEAD_POW);
   var sp = Math.sqrt(vel.x*vel.x + vel.z*vel.z);
+  var targetYaw = sp > 0.35 ? Math.atan2(vel.x, vel.z) : rigYaw;
 
   rig.position.copy(katamari.position);
-  if (sp > 0.35) rigYaw = angLerp(rigYaw, Math.atan2(vel.x, vel.z), 1 - Math.pow(0.0015, dt));
+  if (sp > 0.35) rigYaw = angLerp(rigYaw, targetYaw, 1 - Math.pow(0.0015, dt));
   rig.rotation.y = rigYaw;
 
   var gait = Math.min(1, sp / 5);
@@ -267,9 +336,20 @@ function updateRig(dt){
   headGrp.position.set(0, radius*0.30 + bob*radius*0.2, radius*1.05);
   headGrp.rotation.set(bob, 0, 0);
 
+  if (dt > 0){
+    var targetTail = -sp * 0.22 - (rigYaw - targetYaw) * 1.2;
+    tailVel += (targetTail - tailSpring) * 14 * dt;
+    tailVel *= Math.pow(0.84, dt * 60);
+    tailSpring += tailVel * dt;
+  }
+
   tailGrp.scale.setScalar(hs*0.95);
   tailGrp.position.set(0, radius*0.62, -radius*1.05);
-  tailGrp.rotation.set(0, 0, Math.sin(bobT*7) * 0.16 * gait);
+  tailGrp.rotation.set(
+    Math.sin(bobT*7) * 0.08 * gait,
+    tailSpring,
+    Math.sin(bobT*7) * 0.10 * gait
+  );
 }
 
 // ---------------------------------------------------------------- a horse, generally
@@ -1329,7 +1409,7 @@ function setRadius(r){
   core.scale.setScalar(r);
   scene.fog.near = 60 + r*9;
   scene.fog.far  = 230 + r*34;
-  camera.far = scene.fog.far + 40;
+  camera.far = Math.max(scene.fog.far + 40, 520);
   camera.updateProjectionMatrix();
   var ext = Math.max(20, r*9);
   var sc = sun.shadow.camera;
@@ -1370,6 +1450,8 @@ function reset(){
   shake    = 0;
   rigYaw   = 0;
   bobT     = 0;
+  tailSpring = 0;
+  tailVel  = 0;
   nayAt    = 0;
   nayProp  = null;
 
@@ -1390,6 +1472,7 @@ function reset(){
   syncClock();
   updateRig(0);
   placeCamera(0, true);
+  placeSky();
 }
 
 // ---------------------------------------------------------------- collecting
@@ -1774,8 +1857,12 @@ function step(dt){
 }
 
 function followSun(){
-  sun.position.set(katamari.position.x + 30, 55, katamari.position.z + 22);
+  sun.position.set(katamari.position.x + 22, 55, katamari.position.z - 30);
   sun.target.position.copy(katamari.position);
+}
+function placeSky(){
+  sky.position.copy(camera.position);
+  sunDisc.position.copy(camera.position).addScaledVector(SUN_DIR, 320);
 }
 
 var acc = 0;
@@ -1814,6 +1901,7 @@ function frame(){
   followSun();
   updateRig(dt);
   placeCamera(dt, false);
+  placeSky();
   renderer.render(scene, camera);
   popInterp();
 }
@@ -1905,6 +1993,7 @@ function showKing(k){
   applyFov();
   updateRig(0);
   placeCamera(0, true);
+  placeSky();
   syncHUD();
   stashPrev();
 }
