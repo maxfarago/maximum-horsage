@@ -69,12 +69,13 @@ renderer.shadowMap.type = THREE.BasicShadowMap;
 renderer.outputEncoding = THREE.sRGBEncoding;
 document.body.appendChild(renderer.domElement);
 
-var SKY_HORIZON = 0xc8eef8;
-var SUN_DIR     = new THREE.Vector3(22, 55, -30).normalize();
+var SKY_FOG     = 0x58b4e4;
+var SUN_LIGHT   = new THREE.Vector3(22, 55, -30);
+var SUN_VIEW    = new THREE.Vector3(8, 12, -45).normalize();
 
 var scene = new THREE.Scene();
-scene.background = new THREE.Color(SKY_HORIZON);
-scene.fog = new THREE.Fog(SKY_HORIZON, 60, 230);
+scene.background = new THREE.Color(SKY_FOG);
+scene.fog = new THREE.Fog(SKY_FOG, 60, 230);
 
 var camera = new THREE.PerspectiveCamera(58, innerWidth/innerHeight, 0.1, 700);
 
@@ -91,45 +92,50 @@ scene.add(sun.target);
 
 // ---------------------------------------------------------------- ground
 function groundTexture(){
-  var s = 1024, i, x, y, rx, ry, rot, ox, oz;
+  var s = 1024, i, k, n, cx, cy, r, a, rr, px, py, ox, oz;
   var c = document.createElement("canvas"); c.width = c.height = s;
   var g = c.getContext("2d");
-  g.fillStyle = "#78c455"; g.fillRect(0,0,s,s);
-  function blob(color, n, r0, r1){
-    g.fillStyle = color;
-    for (i=0;i<n;i++){
-      x = trnd()*s; y = trnd()*s;
-      rx = r0 + trnd()*(r1-r0);
-      ry = rx * (0.55 + trnd()*0.7);
-      rot = trnd()*6.283;
+  g.fillStyle = "#7ac853"; g.fillRect(0,0,s,s);
+  function parcel(fill, stroke, count, r0, r1){
+    for (i=0;i<count;i++){
+      cx = trnd()*s; cy = trnd()*s;
+      r = r0 + trnd()*(r1-r0);
+      n = 5 + (trnd()*4)|0;
+      g.beginPath();
+      for (k=0;k<n;k++){
+        a = (k/n)*6.283 + trnd()*0.35;
+        rr = r * (0.62 + trnd()*0.5);
+        px = cx + Math.cos(a)*rr;
+        py = cy + Math.sin(a)*rr;
+        if (k===0) g.moveTo(px, py); else g.lineTo(px, py);
+      }
+      g.closePath();
       for (ox=-1;ox<=1;ox++) for (oz=-1;oz<=1;oz++){
-        g.beginPath();
-        g.ellipse(x+ox*s, y+oz*s, rx, ry, rot, 0, 6.283);
+        g.save();
+        g.translate(ox*s, oz*s);
+        g.fillStyle = fill;
         g.fill();
+        if (stroke){
+          g.strokeStyle = stroke;
+          g.lineWidth = 7;
+          g.stroke();
+        }
+        g.restore();
       }
     }
   }
-  g.globalAlpha = 0.32;
-  blob("#6cb84c", 70, 16, 48);
-  blob("#86cc5f", 55, 12, 40);
-  g.globalAlpha = 0.22;
-  blob("#5ea844", 36, 10, 32);
-  g.globalAlpha = 0.28;
-  blob("#9a8b48", 9, 6, 18);
-  g.globalAlpha = 1;
-  for (i=0;i<14000;i++){
-    g.fillStyle = trnd()<0.5 ? "rgba(255,255,255,.05)" : "rgba(0,0,0,.045)";
+  parcel("#64b03e", null, 12, 90, 170);
+  parcel("#8bd45a", null, 10, 70, 140);
+  parcel("#58a038", null, 8, 55, 110);
+  parcel("#c2a24a", null, 4, 40, 80);
+  for (i=0;i<8000;i++){
+    g.fillStyle = trnd()<0.5 ? "rgba(255,255,255,.04)" : "rgba(0,0,0,.04)";
     g.fillRect(trnd()*s, trnd()*s, 1+trnd()*2, 1+trnd()*2);
-  }
-  for (i=0;i<220;i++){
-    g.fillStyle = trnd()<0.55 ? "rgba(255,246,224,.45)" : "rgba(255,210,63,.35)";
-    g.beginPath();
-    g.arc(trnd()*s, trnd()*s, 1+trnd()*1.2, 0, 6.283);
-    g.fill();
   }
   var t = new THREE.CanvasTexture(c);
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
-  t.repeat.set(72, 72);
+  t.repeat.set(5, 5);
+  t.offset.set(0.17, 0.31);
   t.encoding = THREE.sRGBEncoding;
   t.anisotropy = Math.min(4, renderer.capabilities.getMaxAnisotropy());
   return t;
@@ -146,11 +152,14 @@ function skyTexture(){
   var c = document.createElement("canvas"); c.width = 8; c.height = 256;
   var g = c.getContext("2d");
   var grd = g.createLinearGradient(0, 0, 0, 256);
-  grd.addColorStop(0, "#2f8fc8");
-  grd.addColorStop(0.38, "#6ec4ea");
-  grd.addColorStop(0.50, "#c8eef8");
-  grd.addColorStop(0.58, "#c8eef8");
-  grd.addColorStop(1, "#74c052");
+  grd.addColorStop(0, "#1a72b0");
+  grd.addColorStop(0.38, "#2a86c4");
+  grd.addColorStop(0.44, "#3c9ed4");
+  grd.addColorStop(0.47, "#58b4e4");
+  grd.addColorStop(0.495, "#f2ddb0");
+  grd.addColorStop(0.515, "#f2ddb0");
+  grd.addColorStop(0.55, "#78c455");
+  grd.addColorStop(1, "#78c455");
   g.fillStyle = grd;
   g.fillRect(0, 0, 8, 256);
   var t = new THREE.CanvasTexture(c);
@@ -159,6 +168,9 @@ function skyTexture(){
   t.minFilter = THREE.LinearFilter;
   return t;
 }
+var skyRoot = new THREE.Group();
+scene.add(skyRoot);
+
 var sky = new THREE.Mesh(
   new THREE.SphereGeometry(420, 24, 16),
   new THREE.MeshBasicMaterial({
@@ -168,15 +180,54 @@ var sky = new THREE.Mesh(
     fog: false
   })
 );
-sky.renderOrder = -1;
-scene.add(sky);
+sky.renderOrder = -2;
+skyRoot.add(sky);
 
-var sunDisc = new THREE.Mesh(
-  new THREE.SphereGeometry(14, 12, 10),
-  new THREE.MeshBasicMaterial({ color: 0xfff3d0, fog: false, depthWrite: false })
-);
+var sunMat = new THREE.MeshBasicMaterial({ color: 0xffe082, fog: false, depthWrite: false });
+var sunDisc = new THREE.Mesh(new THREE.SphereGeometry(36, 16, 12), sunMat);
+sunDisc.position.copy(SUN_VIEW).multiplyScalar(260);
 sunDisc.renderOrder = -1;
-scene.add(sunDisc);
+skyRoot.add(sunDisc);
+
+var sunGlow = new THREE.Mesh(
+  new THREE.SphereGeometry(70, 12, 10),
+  new THREE.MeshBasicMaterial({
+    color: 0xffe08a,
+    fog: false,
+    depthWrite: false,
+    transparent: true,
+    opacity: 0.28
+  })
+);
+sunGlow.position.copy(SUN_VIEW).multiplyScalar(260);
+sunGlow.renderOrder = -1;
+skyRoot.add(sunGlow);
+
+var cloudMat = new THREE.MeshBasicMaterial({ color: 0xd8e4f0, fog: false, depthWrite: false });
+function addCloud(az, el, scale){
+  var g = new THREE.Group();
+  function slab(w, h, d, x, y, z, mat){
+    var m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat || cloudMat);
+    m.position.set(x, y, z);
+    g.add(m);
+  }
+  var shade = new THREE.MeshBasicMaterial({ color: 0xc5d3e4, fog: false, depthWrite: false });
+  slab(1.8, 0.7, 1.1, 0, 0, 0);
+  slab(1.2, 0.55, 0.9, 0.85, 0.12, 0.15);
+  slab(1.0, 0.5, 0.8, -0.75, 0.08, -0.1);
+  slab(0.8, 0.42, 0.7, 0.2, 0.28, -0.05, shade);
+  var dist = 160;
+  var ce = Math.cos(el), se = Math.sin(el);
+  g.position.set(Math.sin(az)*ce*dist, se*dist, -Math.cos(az)*ce*dist);
+  g.scale.setScalar(scale);
+  skyRoot.add(g);
+}
+addCloud(-0.22, 0.22, 48);
+addCloud(0.38, 0.26, 40);
+addCloud(-0.55, 0.18, 52);
+addCloud(0.7, 0.24, 44);
+addCloud(0.05, 0.32, 34);
+addCloud(-0.95, 0.2, 42);
 
 // ---------------------------------------------------------------- the ball
 function ballTexture(){
@@ -1857,12 +1908,11 @@ function step(dt){
 }
 
 function followSun(){
-  sun.position.set(katamari.position.x + 22, 55, katamari.position.z - 30);
+  sun.position.copy(katamari.position).add(SUN_LIGHT);
   sun.target.position.copy(katamari.position);
 }
 function placeSky(){
-  sky.position.copy(camera.position);
-  sunDisc.position.copy(camera.position).addScaledVector(SUN_DIR, 320);
+  skyRoot.position.copy(camera.position);
 }
 
 var acc = 0;
