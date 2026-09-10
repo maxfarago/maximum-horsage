@@ -58,8 +58,15 @@
     opacity:0;transition:opacity .35s,transform .35s}
   #banner.show{opacity:1;transform:translate(-50%,0) scale(1)}
 
+  #flash{position:absolute;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:3}
+  #flash.go{animation:flash .16s ease-out forwards}
+  @keyframes flash{
+    0%{opacity:.82}
+    100%{opacity:0}
+  }
+
   #nay{position:absolute;left:50%;top:47%;font-size:56px;font-weight:700;
-    color:var(--cream);opacity:0;letter-spacing:-.01em;
+    color:var(--cream);opacity:0;letter-spacing:-.01em;z-index:4;
     -webkit-text-stroke:3px var(--ink);paint-order:stroke fill;
     transform:translate(-50%,-50%)}
   #nay.go{animation:nay .78s cubic-bezier(.2,.9,.3,1) forwards}
@@ -149,4 +156,5 @@
   @media (prefers-reduced-motion:reduce){
     .pick{animation-duration:.01s;opacity:1}
     #nay.go{animation-duration:.4s}
+    #flash.go{animation-duration:.01s}
   }
