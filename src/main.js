@@ -16,8 +16,8 @@ var HEAD_K      = 0.85;
 var HEAD_POW    = 0.65;
 var CM_PER_HAND = 10.16;    // four inches, exactly
 var MODE_KEY    = "umatamari-mode";
-var HINT_TIMED  = "Small stuff sticks. Big stuff says nay. Grow quiet — the army only notices when you get big.";
-var HINT_ENDLESS= "No bell. Esc or tap the clock when you're done.";
+var HINT_TIMED  = "Small stuff sticks. Big stuff says nay.";
+var HINT_ENDLESS= "No bell. Stay small and the army ignores you. Esc or tap the clock when you're done.";
 var UP          = new THREE.Vector3(0,1,0);
 var DEBRIS_CAP  = 24;
 var TRACER_CAP  = 40;
@@ -1193,6 +1193,12 @@ function shrinkVolume(amount){
   setRadius(r);
 }
 
+function shedFromImpact(into){
+  var n = 1 + (into / 2.2 | 0);
+  if (n > 8) n = 8;
+  return n;
+}
+
 function shed(count, awayDir){
   if (!attached.length){
     shake = Math.min(0.35, shake + 0.1);
@@ -1246,11 +1252,11 @@ var wantedSeen = false;
 var wantedEl = null;
 
 function wantedLevelFromSize(hh){
-  if (hh < 8.5) return 0;
-  if (hh < 12.0) return 1;
-  if (hh < 14.5) return 2;
-  if (hh < 21.0) return 3;
-  if (hh < 30.0) return 4;
+  if (hh < 16.0) return 0;
+  if (hh < 21.5) return 1;
+  if (hh < 30.0) return 2;
+  if (hh < 45.0) return 3;
+  if (hh < 60.0) return 4;
   return 5;
 }
 
@@ -1266,6 +1272,10 @@ function wantedCaps(stars){
 function updateWantedHUD(){
   if (!wantedEl) wantedEl = document.getElementById("wanted");
   if (!wantedEl) return;
+  if (gameMode !== "endless"){
+    wantedEl.classList.remove("show");
+    return;
+  }
   var icons = wantedEl.querySelectorAll("i");
   var i;
   for (i=0;i<icons.length;i++){
@@ -1345,6 +1355,11 @@ function spawnEnemy(kind){
 }
 
 function maintainEnemies(){
+  if (gameMode !== "endless"){
+    if (wantedStars || soldiers.length || tanks.length || planes.length) clearEnemies();
+    else updateWantedHUD();
+    return;
+  }
   var hh = handsOf(radius);
   var next = wantedLevelFromSize(hh);
   if (next > wantedStars){
@@ -1357,11 +1372,11 @@ function maintainEnemies(){
     else if (wantedStars === 4) banner("Four stars. Heavy response.", 2600);
     else if (wantedStars === 5) banner("Five stars. Now they're cheating.", 2800);
   } else if (next < wantedStars){
-    if (hh < 7.5 && wantedStars > 0){ wantedStars = 0; updateWantedHUD(); }
-    else if (hh < 11 && wantedStars > 1){ wantedStars = 1; updateWantedHUD(); }
-    else if (hh < 13.5 && wantedStars > 2){ wantedStars = 2; updateWantedHUD(); }
-    else if (hh < 19 && wantedStars > 3){ wantedStars = 3; updateWantedHUD(); }
-    else if (hh < 27 && wantedStars > 4){ wantedStars = 4; updateWantedHUD(); }
+    if (hh < 14.5 && wantedStars > 0){ wantedStars = 0; updateWantedHUD(); }
+    else if (hh < 19 && wantedStars > 1){ wantedStars = 1; updateWantedHUD(); }
+    else if (hh < 27 && wantedStars > 2){ wantedStars = 2; updateWantedHUD(); }
+    else if (hh < 40 && wantedStars > 3){ wantedStars = 3; updateWantedHUD(); }
+    else if (hh < 54 && wantedStars > 4){ wantedStars = 4; updateWantedHUD(); }
   }
 
   var caps = wantedCaps(wantedStars);
@@ -1544,6 +1559,7 @@ function clearEnemies(){
 // ---------------------------------------------------------------- state
 var radius, volume, collected, timeLeft, elapsed, running, vel, camYaw, shake, cleared;
 var hp, tier, dirty, gameMode, hitStop = 0, gulpPunch = 0;
+var camTier, camDist = 0, camHigh = 0, camKick = 0;
 
 function setRadius(r){
   radius = r;
@@ -1559,8 +1575,22 @@ function setRadius(r){
   sc.updateProjectionMatrix();
 }
 function powerMul(){ return 1 + Math.log10(Math.max(1,hp)) * 0.30; }
+function framedRadius(t){
+  var i = t + 1;
+  if (i < 0) i = 0;
+  if (i < TIERS.length) return TIERS[i][0] * CM_PER_HAND / 200;
+  return TIERS[TIERS.length-1][0] * CM_PER_HAND / 200 * 1.25;
+}
+function camTargets(t){
+  var r = framedRadius(t);
+  return {
+    dist: 4.2 + r * 4.2,
+    high: 1.8 + r * 2.4,
+    fov: 58 + Math.min(8, Math.max(0, t + 1) * 0.55)
+  };
+}
 function applyFov(){
-  camera.fov = 58 + Math.min(9, Math.log10(Math.max(1,hp)) * 3.2);
+  camera.fov = camTargets(camTier).fov;
   camera.updateProjectionMatrix();
 }
 
@@ -1587,6 +1617,9 @@ function reset(){
   dirty    = false;
   hp       = 1;
   tier     = tierIndex(handsOf(START_R));
+  camTier  = tier;
+  camKick  = 0;
+  camDist  = 0;
   vel      = new THREE.Vector3();
   camYaw   = 0;
   shake    = 0;
@@ -1647,7 +1680,7 @@ function collect(p){
   gulpPunch = Math.min(0.11, gulpPunch + 0.04);
   sfxStick();
 
-  if (p.userData.hp){ hp += p.userData.hp; applyFov(); }
+  if (p.userData.hp) hp += p.userData.hp;
 
   for (i=attached.length-1;i>=0;i--){
     a = attached[i];
@@ -1721,6 +1754,10 @@ function ownerCall(t){
 function checkTier(){
   var h = handsOf(radius);
   var t = tierIndex(h);
+  if (t > camTier){
+    camTier = t;
+    camKick = 1;
+  }
   if (t <= tier) { tier = t; return; }
   tier = t;
   ownerCall(t);
@@ -1732,6 +1769,7 @@ function checkTier(){
 // ---------------------------------------------------------------- nay
 var nayEl = document.getElementById("nay");
 var nayAt = 0, nayProp = null;
+var flashEl = document.getElementById("flash");
 function nay(p){
   var t = performance.now();
   if (p === nayProp && t - nayAt < 1500) return;
@@ -1740,6 +1778,11 @@ function nay(p){
   nayEl.classList.remove("go");
   void nayEl.offsetWidth;
   nayEl.classList.add("go");
+  if (flashEl){
+    flashEl.classList.remove("go");
+    void flashEl.offsetWidth;
+    flashEl.classList.add("go");
+  }
   hitStop = HIT_STOP;
   sfxNay();
 }
@@ -1821,7 +1864,7 @@ function devKey(code){
   if (code === "BracketRight"){ setRadius(radius*1.4); dirty = true; }
   else if (code === "BracketLeft"){ setRadius(Math.max(START_R, radius/1.4)); dirty = true; }
   else if (code === "KeyT" && gameMode === "timed"){ timeLeft += 30; dirty = true; }
-  else if (code === "KeyY"){ hp *= 4; applyFov(); dirty = true; }
+  else if (code === "KeyY"){ hp *= 4; dirty = true; }
   else return;
   checkTier();
   syncHUD();
@@ -1927,12 +1970,27 @@ function popInterp(){
 var camPos = new THREE.Vector3();
 var camAim = new THREE.Vector3();
 function placeCamera(dt, snap){
-  var dist = 4.2 + radius*4.2;
-  var high = 1.8 + radius*2.4;
+  var t = camTargets(camTier);
+  var kick = camKick * 0.2;
+  var dist = t.dist * (1 + kick);
+  var high = t.high * (1 + kick);
+  if (snap || !camDist){
+    camDist = dist;
+    camHigh = high;
+    camera.fov = t.fov;
+    camera.updateProjectionMatrix();
+  } else {
+    var k = 1 - Math.pow(1 - 0.07, dt*60);
+    camDist += (dist - camDist) * k;
+    camHigh += (high - camHigh) * k;
+    camera.fov += (t.fov - camera.fov) * k;
+    camera.updateProjectionMatrix();
+  }
+  if (camKick > 0) camKick = Math.max(0, camKick - dt * 2.4);
   camPos.set(
-    katamari.position.x + Math.sin(camYaw)*dist,
-    katamari.position.y + high,
-    katamari.position.z + Math.cos(camYaw)*dist
+    katamari.position.x + Math.sin(camYaw)*camDist,
+    katamari.position.y + camHigh,
+    katamari.position.z + Math.cos(camYaw)*camDist
   );
   camAim.copy(katamari.position);
   camAim.y += radius*0.6;
@@ -2027,7 +2085,9 @@ function step(dt){
         vel.x += nx*into*1.5;
         vel.z += nz*into*1.5;
         shake = Math.min(0.35, into*0.03);
-        if (into > 1.2) onHit(new THREE.Vector3(nx, 0.1, nz), attached.length ? 1 : 0, p);
+        if (hitInvuln <= 0){
+          onHit(new THREE.Vector3(nx, 0.1, nz), attached.length ? shedFromImpact(into) : 0, p);
+        }
       }
     }
   }
@@ -2185,6 +2245,10 @@ function showKing(k){
   if (startveil.classList.contains("hidden")) return;
   setRadius(k.radius);
   hp = k.hp || 1;
+  tier = tierIndex(handsOf(k.radius));
+  camTier = tier;
+  camKick = 0;
+  camDist = 0;
   applyFov();
   updateRig(0);
   placeCamera(0, true);
